@@ -49,6 +49,15 @@ _PROXY_CANDIDATES = (
 _PROXY_TAIL = os.path.join("node_modules", "mcp-remote", "dist", "proxy.js")
 
 
+def _ver():
+    """客户端自报的版本号，跟 config.VERSION 走（别写死，防漂移）。"""
+    try:
+        import config
+        return config.VERSION
+    except Exception:
+        return "0"
+
+
 def _first_file(paths):
     for p in paths:
         if p and os.path.isfile(p):
@@ -132,7 +141,7 @@ class Client:
             try:
                 self._request("initialize", {
                     "protocolVersion": PROTOCOL, "capabilities": {},
-                    "clientInfo": {"name": "Skein", "version": "0.19.2"}})
+                    "clientInfo": {"name": "Skein", "version": _ver()}})
                 self._request("notifications/initialized", None, notify=True)
                 res = self._request("tools/list", {})
                 self._tools = (res or {}).get("tools") or []

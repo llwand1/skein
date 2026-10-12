@@ -1,6 +1,6 @@
 # Skein 需求文档
 
-> 版本：v0.19.2 | 状态：[WIP] | 更新：2026-10-11
+> 版本：v0.20.0 | 状态：[WIP] | 更新：2026-10-12
 > 项目：**Skein**（/skeɪn/，一绞线）｜ 内部代号／仓库名：task-orb ｜ 开工：2026-10-07
 > 当前状态一句话：需求已澄清，**MVP 桌面端开工中**。阶段顺序＝「原生从悬浮球开始」；完成判据＝「叙事饱和 + 人封顶」。本文档是项目唯一需求真相源。
 
@@ -149,6 +149,12 @@
 > ```
 
 > 📌 拍板（**方案甲**，分两步走）：① **第一步 A（本次先做）** —— AI **按"当前这一期"推荐 2~4 条具体搜索词**，在搜素材抽屉里显示成**可点芯片**，点一下就用手上现成的 Bing 免 key 通道搜（**零外部依赖、当场可验证**）。② **第二步 B（A 之后再继续）** —— 让**原生 AI 接 tinyfish 的 MCP 服务**（`npx -y mcp-remote https://agent.tinyfish.ai/mcp`）；本机 **npx 是坏的**，故**直调全局安装的 `mcp-remote` 的 `dist/proxy.js`**、走 stdio JSON-RPC；**默认开启**（开箱即用"最基本的搜索能力"，node/mcp-remote 缺失自动静默降级），失败**静默降级回 Bing**、绝不卡主流程。启动 B 前需先完成 tinyfish 的**浏览器 OAuth 登录**（token 落 `~/.mcp-auth`）。落地见 §2.30（A）与 §2.31（B，v0.19.1 修默认关 + 提示词不告知联网的坑）。
+
+### P-022 · ★ 开源 + 自动更新 + 开发期自动重启（2026-10-12）
+
+> "每次都要手动重启,改成自动重启吧,然后可以开源了,放到GitHub上好管理一些,并且设置一下自动更新流水线,以及做好readme(产品式的)"
+
+> 📌 落地：① **开发期自动重启** `dev-watch.py` / `dev.bat`（盯 `app/*.py` 的 mtime，一变就重启，不侵入应用代码）；② **开源**推 `github.com/llwand1/skein`（**MIT**；`成片/`、`*.db`、密钥、`__pycache__` 一律 `.gitignore` 不入库）；③ **发布流水线** `.github/workflows/release.yml`（推 `v*` tag → Actions 用 PyInstaller 打包 → 自动建 Release）；④ **应用内自动更新** `app/updater.py`（查 Releases → 下源码包 → 覆盖代码 → 自动重启）+ 设置组 6；⑤ **产品式 README.md**（放根目录）。见 §2.32。
 
 ---
 
@@ -727,6 +733,24 @@ CREATE TABLE IF NOT EXISTS chat(
 
 ---
 
+### 2.32 ★ 开源 · 自动更新 · 开发期自动重启（v0.20.0）
+
+老板原话见 P-022。三件事：**改代码别再手动重启**、**开源到 GitHub**、**自动更新流水线 + 产品式 README**。
+
+**① 开发期自动重启（`dev-watch.py` + `dev.bat`）**：轮询 `app/` 下所有 `.py` 的 mtime（1s），变了就**先杀光所有在跑的 Skein**（按命令行认 `task-orb` + `main.py`，避免多开抢窗口）**再带控制台重启**（有语法错直接打在终端里看得见）。**不侵入应用代码**、不进发布包。为什么不做热重载：PyQt6 GUI 模块没法安全热替换，重启进程最不会残留脏状态（成本一两秒）。用 `python dev-watch.py` 或双击 `dev.bat`。
+
+**② 开源（`github.com/llwand1/skein`，MIT）**：`.gitignore` 排掉 `__pycache__/`、`成片/`（视频/音频大二进制）、`*.db`、`llm.json`/`settings.json`、`.mcp-auth/`、`*.log`。用户数据天然在 `%LOCALAPPDATA%\Skein`，**不在仓里**。开源前全局 grep 过 `sk-`/`Bearer`/`api_key=` 等模式，**源码无硬编码密钥**。
+
+**③ 发布流水线（`.github/workflows/release.yml`）**：推 `v*` tag（或手动 dispatch）→ `windows-latest` 上装依赖 → `pyinstaller --onefile --windowed` 打包 `Skein.exe` → 压 zip → `softprops/action-gh-release` 建 Release 并挂产物。**只装硬依赖**（PyQt6 / pywin32 / Pillow），**不装**可选的 `pyJianYingDraft`，避免 CI 被可选依赖拖挂。
+
+**④ 应用内自动更新（`app/updater.py`）**：`config.VERSION` 是**唯一版本真相源**；`check()` 拉 `releases/latest` 比版本（`_vt` 解析 `vX.Y.Z`）；`apply(url)` 下**源码包** → 解压 → 覆盖 `app/*.py` 与根目录 `.py/.bat/.vbs`（**只覆盖代码，用户数据一概不碰**）→ `restart_now()`（起一个"等本进程退了再拉起"的脱离助手）。设置抽屉新增**组 6「更新」**：`检查更新` + （有新版才出现的）`下载并更新` + `启动时自动检查更新`（默认开，开机后台静默查、没新版不吭声）。**边界（守 §2.9）**：检查/下载/解压**任何一步失败都返回说明、不抛**，照旧用旧版跑；**打包版（frozen）不做源码覆盖**，只提示。
+
+**⑤ 产品式 README.md**：根目录，定位 + 特性 + 快速开始 + 配置 + 联网搜索 + 自动更新 + 数据隐私 + 技术栈 + 结构 + 开发 + 路线图。应用内那份 `app/README.md` 留作**细节手册**。
+
+**测试**：`uitest` 加组 6 断言（检查按钮 + 自动检查开关默认开）；`uitest`/`llmtest` 均**桩掉 `updater.check`**（否则开机静默检查会打真 GitHub）。compileall + uitest + llmtest 全绿。
+
+---
+
 ## §3 明确不做（红线）
 
 | 不做 | 依据 |
@@ -818,4 +842,5 @@ CREATE TABLE IF NOT EXISTS chat(
 | 2026-10-11 | v0.19.0 | **原生 AI 接 tinyfish MCP（§2.31 / P-021，方案甲的 B 步）**：老板要"最基本的搜索能力还是需要的，让原生 AI 用 tinyfish 的 MCP 服务"。①**新增 `app/mcp.py`**：本机 `npx` 坏 → **直调全局 `mcp-remote` 的 `dist/proxy.js`**、讲 stdio JSON-RPC（initialize/initialized/tools.list/tools.call）；常驻子进程 + 线程锁 + 后台读线程按 id 匹配、带超时；**只读白名单** `ALLOWED=("search","fetch_content")`（tinyfish 实测 31 个工具大多有副作用，只放行搜+读）、工具挂 `tf_` 前缀；`find_node/find_proxy/enabled/Client/tool_schemas/call/get_client/reset`；单次结果截 4000 字。②**`brain.llm_chat` 改受限多轮工具回环（≤3 轮）**：MCP 搜索工具**当场执行**、结果回填 `role=tool` 让模型接着用；**池子改球工具照旧只当提议**（等人点「照做」，守 P-010/P-013）；`mcp=None` 时行为与从前完全一致。③**接线**：`main.say` work() 里 `mcp.get_client()` 传进 `llm_chat`；设置抽屉新增**组 5「搜索 MCP · tinyfish（默认关）」**（开关+node/proxy 路径+服务地址，落 settings.json），`save_settings` 存完 `mcp.reset()`。铁律守 §2.9：连接/握手/调用**任何一步失败都静默降级回 §2.22 Bing 通道、绝不卡主流程**（OAuth 已由 mcp-remote 完成，token 在 `~/.mcp-auth`，本模块不碰凭据）。测试：`llmtest` 加 `_StubMcp`（搜索当场执行/参数原样/同轮改球只当提议/`mcp=None` 走老路），`uitest` 加组 5 断言（开关默认关、三字段存在且能落盘）；compileall + uitest + llmtest 全绿 |
 | 2026-10-11 | v0.19.1 | **修 MCP 不生效（§2.31 / P-021）**：老板实测反馈"Skein 的 AI 回复说它自己没有联网搜索工具"。查库坐实两条根因 —— ① `settings.json` 里**根本没有 `mcp_enabled`**（v0.19.0 设计为默认关，老板没进设置勾选）→ `get_client()` 返回 None → 塞给模型的工具里压根没有搜索工具，故 AI 如实回"我这没接搜索工具"；② 即便开了，**系统提示词 `_CHAT_TAIL` 只描述了改球工具、没告诉模型"你能联网"** → 模型看到 `tf_search` 也不会当自己有能力。修法（方案 A）：**① MCP 默认改成开**（`mcp.enabled()` 缺省 True、`panel._load_settings_form` 同步；显式 false 才关；node/mcp-remote 找不到本就静默降级，无副作用，符合 P-021"最基本的搜索能力"）；**②`brain.llm_chat` 在有搜索工具时往 system 追加一句**"你现在能联网：可以调用 tf_search 联网搜索、读取网页正文…别声称自己没有联网能力"。测试：`uitest`/`llmtest` 均**桩掉 `mcp.get_client`**（默认开后否则每次 say 都会拉 node、打真网络），`llmtest` 加"提示词明说能联网"断言、`uitest` 改"开关默认开"；compileall + uitest + llmtest 全绿 |
 | 2026-10-11 | v0.19.2 | **MCP 真机仍失败 → 定位到"收口轮超时"并重构（§2.31 / P-021）**：老板二次反馈"实际使用还是没有成功，且对话会一直变长"。**查库 + 实测复现**坐实根因：① `llm.chat_message` 默认 **TIMEOUT=25s**，挂搜索后收口那一轮（带全套池子/历史/工具 + 结果回填）实测能跑 **45s+**，超时抛错 → 老代码 `break` 把整条丢掉 → `got=None` → 界面回"模型这次没答上来"（DB 里 23:11 那条 sys 就是它）；② `mcp.get_client()` 会**缓存连不上的空壳**实例，一次失败 → 永久没搜索；③ 对话越聊越长 = 历史每条原文喂回 + 模型整段复述搜索结果。**修法**：① 搜索改成"**一次收口**"——搜到内容后**只把结果单独发一次收口请求**（不带池子/历史/工具），又快又不易超时；收口失败则**直接摘原文兜底**（绝不空手）；单轮超时提到 45s、回复限长 400 字；② `get_client()` 连不上**不缓存**，下次重试；③ 开机 `_kick_mcp_warm()` 后台预热连接；④ 喂回模型的"最近聊过" 8 条→6 条、每条截 240 字；`RESULT_CHARS` 4000→1500。**实测**：真实模型跑通（`tf_search` 真调用成功、回复压到 ~130 字、`last_error=None`）。测试：`llmtest` 加"收口轮超时也不丢整条"断言；compileall + uitest + llmtest 全绿 |
+| 2026-10-12 | v0.20.0 | **开源 + 自动更新 + 开发期自动重启（§2.32 / P-022）**：老板要"每次都要手动重启改成自动重启、开源放 GitHub 好管理、设置自动更新流水线、做产品式 README"。① **开发期自动重启**：新增 `dev-watch.py`（轮询 `app/` 下 `.py` mtime，变了就先杀光在跑的 Skein 再带控制台重启，不侵入应用代码）+ `dev.bat` 一键入口；② **开源**：`.gitignore`（排 `__pycache__`/`成片/`/`*.db`/`llm.json`/`.mcp-auth/`）+ MIT `LICENSE`，`git init` 后推 `github.com/llwand1/skein`（公开）；③ **发布流水线**：`.github/workflows/release.yml`（推 `v*` tag → PyInstaller 打包 `Skein.exe` → 自动建 Release），打 `v0.20.0` tag 已触发；④ **应用内自动更新**：新增 `app/updater.py`（`config.VERSION` 唯一真相源 + `check/apply/restart_now`，只覆盖代码不碰用户数据）+ `main` 的检查/下载/重启接线 + 设置抽屉**组 6「更新」**（检查更新 / 下载并更新 / 启动时自动检查更新），开机后台静默查；⑤ **产品式 `README.md`**（根目录）+ `config.py` 加 `VERSION`/`GITHUB_OWNER`/`GITHUB_REPO` 并修正过时的注释（`mcp` 的 clientInfo 版本号也改成跟 `config.VERSION` 走，防漂移）。测试：`uitest` 加组 6 断言、两套走查均桩掉 `updater.check`；compileall + uitest + llmtest 全绿 |
 
