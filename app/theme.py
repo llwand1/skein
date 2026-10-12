@@ -52,10 +52,16 @@ VIOLET = "#b9a0f0"
 FONT = "Microsoft YaHei UI"
 MONO = "Cascadia Mono"
 
+# 字号四档（A·纪律：仍然只有 4 档，只是整体上移）—— 高 DPI 屏上原来偏小（§2.34）
+FS_PANEL = 26      # 面板级（原 15）
+FS_TITLE = 22      # 标题级（原 13）
+FS_BODY = 20       # 正文 / 按钮 / 输入（原 12）
+FS_AUX = 18        # 辅助（原 11）
+
 QSS = """
 * { font-family: "Microsoft YaHei UI", "Segoe UI", sans-serif; }
-/* 字号只有 4 档：15（面板级）13（标题级）12（正文/按钮）11（辅助）—— 别再插新数字 */
-QWidget { color: #f4ede1; font-size: 12px; }
+/* 字号只有 4 档：面板级 / 标题级 / 正文 / 辅助 —— 见 theme.FS_*，别再插新数字 */
+QWidget { color: #f4ede1; font-size: %(body)dpx; }
 
 /* #root 只当内容容器：背景/圆角/投影都由 Panel.paintEvent 画（展开动效要逐帧改圆角）*/
 #root {
@@ -65,8 +71,8 @@ QWidget { color: #f4ede1; font-size: 12px; }
 
 /* ---------- 标题栏 ---------- */
 #titlebar { background: transparent; border-bottom: 1px solid rgba(244,237,225,0.07); }
-#appname  { font-size: 13px; font-weight: 600; color: #f4ede1; letter-spacing: .3px; }
-#subtitle { font-size: 11px; color: #807664; }
+#appname  { font-size: %(title)dpx; font-weight: 600; color: #f4ede1; letter-spacing: .3px; }
+#subtitle { font-size: %(aux)dpx; color: #807664; }
 /* 关闭 / 设置：都是自绘图标按钮（§2.27）—— 底色透明、无色，变色由 IconButton 自己切图 */
 QPushButton#close {
   background: transparent; border: none; padding: 0px;
@@ -89,34 +95,34 @@ QFrame#deepbox { background: #121110; border: none; border-left: 1px solid #2a26
 QFrame#proposal { background: #1c1913; border: none; border-top: 1px dashed #4a4034; }
 
 /* ---------- 文本 ---------- */
-QLabel#h1  { font-size: 15px; font-weight: 600; color: #f4ede1; }
-QLabel#h2  { font-size: 13px; font-weight: 700; color: #f4ede1; }
-QLabel#cap { font-size: 11px; color: #807664; letter-spacing: .9px; font-weight: 700;
+QLabel#h1  { font-size: %(panel)dpx; font-weight: 600; color: #f4ede1; }
+QLabel#h2  { font-size: %(title)dpx; font-weight: 700; color: #f4ede1; }
+QLabel#cap { font-size: %(aux)dpx; color: #807664; letter-spacing: .9px; font-weight: 700;
              font-family: "Cascadia Mono", "Consolas", monospace; }
-QLabel#dim { font-size: 11px; color: #807664; }
-QLabel#fg2 { font-size: 12px; color: #b6ab97; }
-QLabel#gold { font-size: 12px; font-weight: 600; color: #FFD01F; }
-QLabel#blue { font-size: 11px; font-weight: 700; color: #86b6e6; }
-QLabel#now  { font-size: 15px; font-weight: 700; color: #f4ede1; }
+QLabel#dim { font-size: %(aux)dpx; color: #807664; }
+QLabel#fg2 { font-size: %(body)dpx; color: #b6ab97; }
+QLabel#gold { font-size: %(body)dpx; font-weight: 600; color: #FFD01F; }
+QLabel#blue { font-size: %(aux)dpx; font-weight: 700; color: #86b6e6; }
+QLabel#now  { font-size: %(panel)dpx; font-weight: 700; color: #f4ede1; }
 
 /* ---------- 表单 ---------- */
 QPlainTextEdit {
-  background: #141210; border: 1px solid #332c23; border-radius: 9px;
-  padding: 8px 10px; color: #f4ede1; selection-background-color: #3a3323;
+  background: #141210; border: 1px solid #332c23; border-radius: 11px;
+  padding: 11px 14px; color: #f4ede1; selection-background-color: #3a3323;
 }
 QPlainTextEdit:focus { border: 1px solid #FFD01F; }
 QLineEdit {
-  background: #141210; border: 1px solid #332c23; border-radius: 9px;
-  padding: 9px 10px; color: #f4ede1; selection-background-color: #3a3323;
+  background: #141210; border: 1px solid #332c23; border-radius: 11px;
+  padding: 12px 14px; color: #f4ede1; selection-background-color: #3a3323;
 }
 QLineEdit:hover { border-color: #4a4034; }
 QLineEdit:focus { border: 1px solid #FFD01F; }
 QComboBox {
-  background: #141210; border: 1px solid #332c23; border-radius: 9px;
-  padding: 6px 10px; color: #f4ede1;
+  background: #141210; border: 1px solid #332c23; border-radius: 11px;
+  padding: 9px 14px; color: #f4ede1;
 }
 QComboBox:hover { border-color: #4a4034; }
-QComboBox::drop-down { border: none; width: 22px; }
+QComboBox::drop-down { border: none; width: 28px; }
 QComboBox QAbstractItemView {
   background: #191612; border: 1px solid #332c23; color: #f4ede1;
   selection-background-color: #3a3323; outline: none;
@@ -124,8 +130,8 @@ QComboBox QAbstractItemView {
 
 /* ---------- 按钮 ---------- */
 QPushButton {
-  background: #1d1915; border: 1px solid #332c23; border-radius: 8px;
-  padding: 7px 12px; color: #f4ede1; font-size: 12px;
+  background: #1d1915; border: 1px solid #332c23; border-radius: 11px;
+  padding: 10px 16px; color: #f4ede1; font-size: %(body)dpx;
 }
 QPushButton:hover { background: #252019; border-color: #4a4034; }
 QPushButton:pressed { background: #17140f; }
@@ -133,7 +139,7 @@ QPushButton:pressed { background: #17140f; }
 QPushButton:disabled { background: #1a1712; border: 1px solid #2b251e; color: #6b6254; }
 QPushButton#primary {
   background: #FFD01F; border: 1px solid #FFDE63; color: #1a160d;
-  font-weight: 700; padding: 11px 14px; border-radius: 9px; font-size: 13px;
+  font-weight: 700; padding: 14px 20px; border-radius: 12px; font-size: %(title)dpx;
 }
 QPushButton#primary:hover { background: #FFDE63; border-color: #FFF0B8; }
 QPushButton#primary:pressed { background: #E8BE12; }
@@ -164,8 +170,8 @@ QPushButton#plain:hover { border-color: #4a4034; color: #f4ede1; }
 /* ---------- 触发式构件（§2.20）---------- */
 /* 触发条上的芯片：收着是哑色、体积很小；开着描金，表示这一抽屉正展开 */
 QPushButton#chip, QPushButton#chipon {
-  background: #17140f; border: 1px solid #332c23; border-radius: 12px;
-  padding: 3px 10px; color: #b6ab97; font-size: 12px;
+  background: #17140f; border: 1px solid #332c23; border-radius: 16px;
+  padding: 5px 14px; color: #b6ab97; font-size: %(body)dpx;
 }
 QPushButton#chip:hover { border-color: #4a4034; color: #f4ede1; }
 QPushButton#chipon { border-color: #6b5a1c; color: #FFD01F; }
@@ -173,13 +179,13 @@ QPushButton#chipon:hover { border-color: #FFD01F; }
 /* 收口：一个小勾 */
 QPushButton#cap {
   background: transparent; border: 1px solid #6b5a1c; color: #FFD01F;
-  border-radius: 12px; padding: 3px 10px; font-size: 12px; font-weight: 700;
+  border-radius: 16px; padding: 5px 14px; font-size: %(body)dpx; font-weight: 700;
 }
 QPushButton#cap:hover { border-color: #FFD01F; }
 /* 「?」长说明：一点小圆角，点开就地展开一行 */
 QPushButton#q {
-  background: transparent; border: 1px solid #332c23; border-radius: 8px;
-  color: #807664; font-size: 11px; padding: 0;
+  background: transparent; border: 1px solid #332c23; border-radius: 9px;
+  color: #807664; font-size: %(aux)dpx; padding: 0;
 }
 QPushButton#q:hover { border-color: #4a4034; color: #f4ede1; }
 
@@ -188,17 +194,17 @@ QPushButton#q:hover { border-color: #4a4034; color: #f4ede1; }
    「你」的线暖一点、"AI"的线冷一点，只是一条线，不是一块底色。 */
 #turnyou { border: none; border-left: 1px solid #4d4013; }
 #turnai  { border: none; border-left: 1px solid #332c23; }
-QLabel#whoyou { font-size: 11px; font-weight: 700; color: #8a7742; letter-spacing: .9px; }
-QLabel#whoai  { font-size: 11px; font-weight: 700; color: #807664; letter-spacing: .9px; }
+QLabel#whoyou { font-size: %(aux)dpx; font-weight: 700; color: #8a7742; letter-spacing: .9px; }
+QLabel#whoai  { font-size: %(aux)dpx; font-weight: 700; color: #807664; letter-spacing: .9px; }
 /* 每条消息那个小小的「复制」 */
 QPushButton#mini {
-  background: transparent; border: none; color: #6b6254; font-size: 11px; padding: 0;
+  background: transparent; border: none; color: #6b6254; font-size: %(aux)dpx; padding: 0;
 }
 QPushButton#mini:hover { color: #FFD01F; }
 /* 封顶之后那枚可点的「已确认足够」 */
 QPushButton#capdone {
   background: #14200c; border: 1px solid #3f5220; color: #9ecf4e;
-  border-radius: 12px; padding: 3px 10px; font-size: 12px; font-weight: 700;
+  border-radius: 16px; padding: 5px 14px; font-size: %(body)dpx; font-weight: 700;
 }
 QPushButton#capdone:hover { border-color: #9ecf4e; }
 
@@ -216,14 +222,14 @@ QTextBrowser#rich:focus, QTextBrowser#richturn:focus { border: none; outline: no
 
 /* ---------- 滚动区 ---------- */
 QScrollArea { border: none; background: transparent; }
-QScrollBar:vertical { background: transparent; width: 8px; margin: 4px 2px 4px 0; }
-QScrollBar::handle:vertical { background: #3a3327; border-radius: 4px; min-height: 32px; }
+QScrollBar:vertical { background: transparent; width: 12px; margin: 4px 2px 4px 0; }
+QScrollBar::handle:vertical { background: #3a3327; border-radius: 6px; min-height: 40px; }
 QScrollBar::handle:vertical:hover { background: #4a4034; }
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
 QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }
 
 /* ---------- 菜单 ---------- */
-QMenu { background: #191612; border: 1px solid #332c23; padding: 5px; }
-QMenu::item { padding: 6px 22px 6px 14px; border-radius: 7px; color: #f4ede1; }
+QMenu { background: #191612; border: 1px solid #332c23; padding: 6px; }
+QMenu::item { padding: 8px 26px 8px 16px; border-radius: 8px; color: #f4ede1; }
 QMenu::item:selected { background: #3a3323; }
-"""
+""" % {"panel": FS_PANEL, "title": FS_TITLE, "body": FS_BODY, "aux": FS_AUX}

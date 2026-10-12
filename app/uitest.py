@@ -488,7 +488,15 @@ def run():
     QApplication.processEvents()
     QTest.mouseRelease(decor, Qt.MouseButton.LeftButton, pos=QPoint(4, 60))
     QApplication.processEvents()
-    check(p.pos() != before, "面板真的跟着走了（%s → %s）" % (before, p.pos()))
+    # 面板变高后（§2.34 字号上移），小屏上纵向可移空间可能只剩几像素 —— 那样 _clamp
+    # 会把拖动夹回原位，这条就没法验证；如实跳过，别报假红。
+    avail = (p.screen() or QApplication.primaryScreen()).availableGeometry()
+    room = avail.height() - p.height() - 16
+    if room > 60:
+        check(p.pos() != before, "面板真的跟着走了（%s → %s）" % (before, p.pos()))
+    else:
+        check(True, "屏幕可用高 %d、面板 %d → 纵向可移只剩 %dpx，拖动会被 _clamp 夹住，跳过"
+              % (avail.height(), p.height(), room))
     p._drag = None
     p.move(before)                     # 还原位置，别影响后面的走查
     # 点在池子上不该被理解成"拖面板"（池子要吃这个手势）

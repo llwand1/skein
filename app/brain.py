@@ -776,8 +776,8 @@ _CHAT_TAIL = (" 现在你在和创作者**当面聊**这一期怎么讲：顺着
               "改动不要只在嘴上说：能调用工具就直接调用；"
               "如果你的接口不能调用工具，就把改动放进一个 JSON —— "
               '{"reply":"…","actions":[{"tool":"rename_ball","ball":12,"question":"…"}]}。'
-              "**回复务必短**：说人话、两三句就够，不分点、不复述资料 —— "
-              "联网搜到的东西只挑你要用的那一句写进去（对话越聊越长，P-021）。")
+              "**把话说完**：说人话，该展开就展开（一般三五句），**别只写半截**；"
+              "不分点、不客套、别照抄资料原文 —— 要引用就用自己的话概括完（§2.34）。")
 
 
 # ---------------- 一期记忆蒸馏（§2.28）：把对话收成"已定口径" ----------------
@@ -844,8 +844,8 @@ def llm_chat(topic, beats_all, mbb, history, user_text, unassigned=(), mcp=None,
     should_stop 非空 = 可中断（返回 True 就提前收口，把已拿到的部分交出去）。
     """
     his = "\n".join("%s：%s" % ("他" if h.get("role") == "you" else "你",
-                                _clip(h.get("text"), 240))
-                    for h in history[-6:] if h.get("role") in ("you", "ai"))
+                                _clip(h.get("text"), 320))
+                    for h in history[-8:] if h.get("role") in ("you", "ai"))
     mem = (topic.get("memory") or "").strip()
     mem_block = ""
     if mem:
@@ -869,7 +869,7 @@ def llm_chat(topic, beats_all, mbb, history, user_text, unassigned=(), mcp=None,
                    "别声称自己没有联网能力。" % "、".join(sorted(mcp_names)))
     user = ("期名：%s\npayoff：%s\n当前池子：\n%s\n\n"
             "%s【最近聊过】\n%s\n\n他刚说：%s\n\n"
-            "先回他（说人话，两三句，别分点、别客套）；要改池子就直接调用相应工具。"
+            "先回他（说人话、把话说完整，别分点、别客套）；要改池子就直接调用相应工具。"
             % (topic["name"], topic.get("payoff") or "（未定）",
                _pool_ctx(beats_all, mbb, unassigned), mem_block, his, user_text))
 
@@ -923,9 +923,11 @@ def llm_chat(topic, beats_all, mbb, history, user_text, unassigned=(), mcp=None,
                 try:
                     m2 = _ask([{"role": "system", "content": system},
                                {"role": "user", "content":
+                                "期名：%s\n他刚说：%s\n\n"
                                 "这是我刚联网搜到的内容：\n%s\n\n"
-                                "请用两三句话，只挑跟这一期大纲相关、最有用的那点写成回复；"
-                                "别复述、别分点。" % (digest or "（没搜到）")}],
+                                "请基于这些内容，用**完整**的几句话回他 —— 把话说完、别只写半截；"
+                                "用自己的话概括，别照抄原文、别堆列表。" % (
+                                    topic["name"], user_text, digest or "（没搜到）")}],
                               with_tools=False)
                     reply = str((m2 or {}).get("content") or "").strip() or reply
                 except Exception as e:
@@ -955,9 +957,10 @@ def llm_chat(topic, beats_all, mbb, history, user_text, unassigned=(), mcp=None,
         return None
     if not reply:
         reply = "我打算这么改。"
-    # 回复也要"短"：搜索结果一多，模型容易整段复述 —— 再兜一道长度上限（对话越聊越长，P-021）
-    if len(reply) > 400:
-        reply = reply[:400].rstrip() + "…"
+    # 回复**不再硬截断**（§2.34）：上版的 400 字上限会把话切在半句，用户直接反馈"总是断信息"。
+    # 真要防失控，把上限放到几乎够不着的位置 —— 正常一轮回复远不到这里。
+    if len(reply) > 4000:
+        reply = reply[:4000].rstrip() + "…"
     return {"reply": reply, "actions": actions}
 
 

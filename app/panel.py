@@ -55,12 +55,12 @@ from PyQt6.QtWidgets import (QWidget, QFrame, QLabel, QVBoxLayout, QHBoxLayout,
 
 DOT = {"empty": RED, "supported": AMBER, "locked": GREEN}
 STXT = {"empty": "未支撑", "supported": "待确认", "locked": "已确认"}
-TITLEBAR_H = 48
+TITLEBAR_H = 64
 
-PAD = 16           # 窗口四周留白：也是玻璃/纸面相对窗口的内缩量
+PAD = 20           # 窗口四周留白：也是玻璃/纸面相对窗口的内缩量
 R_PANEL = 16       # 展开完成后的圆角
-W_FULL, H_FULL = 520, 736
-GUTTER = 16        # 内容左侧留白（原来 34px 是给那条"一绞线"留的，线删了就收回来）
+W_FULL, H_FULL = 640, 820
+GUTTER = 22        # 内容左侧留白（原来 34px 是给那条"一绞线"留的，线删了就收回来）
 MORPH_OPEN = 480   # ms
 MORPH_CLOSE = 360  # ms（出场 = 入场的 75%）
 CONTENT_AT = 0.72  # 形状走到这里才放内容出来（此时圆角已落到 16px，内容不会再溢出轮廓）
@@ -72,16 +72,16 @@ ANIMATE = True     # uitest 会置 False，让走查保持同步
 # 用 markdown 库把回复转成 HTML，样式贴 theme（A·纪律：字号只用 12/13/15）。
 _MD_CSS = (
     "p { margin: 0 0 7px 0; }"
-    "h1 { color: %s; font-size: 15px; font-weight: 600; margin: 10px 0 5px 0; }"
-    "h2 { color: %s; font-size: 13px; font-weight: 700; margin: 9px 0 5px 0; }"
-    "h3 { color: %s; font-size: 12px; font-weight: 700; margin: 8px 0 4px 0; }"
+    "h1 { color: %s; font-size: 26px; font-weight: 600; margin: 12px 0 6px 0; }"
+    "h2 { color: %s; font-size: 22px; font-weight: 700; margin: 11px 0 6px 0; }"
+    "h3 { color: %s; font-size: 20px; font-weight: 700; margin: 10px 0 5px 0; }"
     "a { color: %s; }"
-    "code { font-family: 'Cascadia Mono','Consolas',monospace; font-size: 11px; color: %s; }"
-    "pre { background-color: #141210; padding: 8px; }"
-    "blockquote { color: %s; margin: 6px 0 6px 10px; }"
-    "ul, ol { margin: 4px 0 7px 0; }"
-    "li { margin: 2px 0; }"
-    "th, td { padding: 3px 8px; }"
+    "code { font-family: 'Cascadia Mono','Consolas',monospace; font-size: 17px; color: %s; }"
+    "pre { background-color: #141210; padding: 10px; }"
+    "blockquote { color: %s; margin: 8px 0 8px 12px; }"
+    "ul, ol { margin: 5px 0 8px 0; }"
+    "li { margin: 3px 0; }"
+    "th, td { padding: 4px 10px; }"
     % (T.FG, T.FG, T.FG, T.BLUE, T.AMBER, T.FG3)
 )
 _MD = {"m": None}
@@ -101,8 +101,8 @@ def md_html(text, caret=False):
         import html as _h
         body = "<p>%s</p>" % _h.escape(src).replace("\n", "<br>")
     if caret:
-        body += ('<p style="margin:0"><span style="color:%s;font-size:13px;">▍</span></p>' % T.GOLD)
-    return '<div style="font-size:12px;color:%s;line-height:150%%;">%s</div>' % (T.FG2, body)
+        body += ('<p style="margin:0"><span style="color:%s;font-size:22px;">▍</span></p>' % T.GOLD)
+    return '<div style="font-size:20px;color:%s;line-height:150%%;">%s</div>' % (T.FG2, body)
 
 
 class RichText(QTextBrowser):
@@ -152,7 +152,7 @@ class RichText(QTextBrowser):
                 self.document().setTextWidth(w)
                 h = int(self.document().size().height()) + 2
                 if abs(h - self.height()) > 1:
-                    self.setFixedHeight(max(18, h))
+                    self.setFixedHeight(max(28, h))
         finally:
             self._fitting = False
 
@@ -164,7 +164,7 @@ class ThinkingDots(QWidget):
         super().__init__(parent)
         self._text = text
         self._t = 0
-        self.setFixedHeight(18)
+        self.setFixedHeight(26)
         self._tm = QTimer(self)
         self._tm.timeout.connect(self._tick)
         if ANIMATE:
@@ -182,10 +182,10 @@ class ThinkingDots(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         f = self.font()
-        f.setPointSizeF(9.5)
+        f.setPointSizeF(13.0)
         p.setFont(f)
         p.setPen(QPen(QColor(FG3)))
-        p.drawText(QRect(0, 0, 78, self.height()),
+        p.drawText(QRect(0, 0, 112, self.height()),
                    int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft), self._text)
         for i in range(3):
             a = 0.28 + 0.72 * (0.5 + 0.5 * math.sin((self._t / 40.0 * 2 * math.pi) - i * 0.7))
@@ -193,7 +193,7 @@ class ThinkingDots(QWidget):
             c.setAlphaF(a)
             p.setBrush(QBrush(c))
             p.setPen(Qt.PenStyle.NoPen)
-            p.drawEllipse(QRectF(82 + i * 9, self.height() / 2.0 - 2, 4, 4))
+            p.drawEllipse(QRectF(118 + i * 13, self.height() / 2.0 - 3, 6, 6))
         p.end()
 
 
@@ -479,7 +479,7 @@ class Panel(QWidget):
         row = QHBoxLayout()
         row.setSpacing(8)
         lab = self._lab(label, "dim")
-        lab.setFixedWidth(58)
+        lab.setFixedWidth(84)
         row.addWidget(lab)
         ed = QLineEdit(self._set_form.get(key, ""))
         ed.setObjectName("set_" + key)
@@ -529,7 +529,7 @@ class Panel(QWidget):
         sp = QPlainTextEdit(self._set_form.get("sys_prompt", ""))
         sp.setObjectName("set_sys_prompt")
         sp.setPlaceholderText("留空＝不预设人设，用通用叙事助手兜底")
-        sp.setFixedHeight(96)
+        sp.setFixedHeight(120)
         sp.textChanged.connect(lambda: self._set_form.__setitem__("sys_prompt", sp.toPlainText()))
         v.addWidget(sp)
 
@@ -1100,11 +1100,11 @@ class Panel(QWidget):
             nm.setToolTip(" · ".join(bits))
             head.addWidget(nm, 1)
             rn = self._btn("改期名", "plain")
-            rn.setFixedWidth(66)
+            rn.setFixedWidth(92)
             rn.clicked.connect(self._edit_topic_now)
             head.addWidget(rn)
         sw = self._btn("切换", "plain")
-        sw.setFixedWidth(58)
+        sw.setFixedWidth(84)
         sw.setToolTip("把它挂起，回到无主题态（这时才能起新的一期）")
         sw.clicked.connect(self.app.detach_topic)
         head.addWidget(sw)
@@ -1128,7 +1128,7 @@ class Panel(QWidget):
         else:
             row.addWidget(self._lab(t["payoff"] or "（未填）", "fg2"), 1)
             pe = self._btn("改", "plain")
-            pe.setFixedWidth(40)
+            pe.setFixedWidth(58)
             pe.setToolTip("改这一期最想让人记住的那一句")
             pe.clicked.connect(self._edit_payoff_now)
             row.addWidget(pe)
@@ -1218,7 +1218,7 @@ class Panel(QWidget):
             self._stop_caret()
         self.chat_input = QPlainTextEdit()
         self.chat_input.setPlaceholderText("和它说点什么…（Enter 换行，Ctrl+Enter 发送）")
-        self.chat_input.setFixedHeight(56)
+        self.chat_input.setFixedHeight(78)
         self.chat_input.setEnabled(not s.get("chat_busy"))
         v.addWidget(self.chat_input)
         row = QHBoxLayout()
@@ -1453,13 +1453,13 @@ class Panel(QWidget):
         h.addWidget(self._lab("%s%s" % (label, body[:cut]), "dim"), 1)
         if path:
             b = self._btn("打开", "plain")
-            b.setFixedWidth(48)
+            b.setFixedWidth(68)
             b.setToolTip(path)
             b.clicked.connect(lambda _, p=path: self.app.open_url(p))
             h.addWidget(b)
         if is_url:
             b = self._btn("打开源", "plain")
-            b.setFixedWidth(58)
+            b.setFixedWidth(84)
             b.setToolTip(src)
             b.clicked.connect(lambda _, u=src: self.app.open_url(u))
             h.addWidget(b)
@@ -1481,7 +1481,7 @@ class Panel(QWidget):
         v.addWidget(self.combo)
         self.input = QPlainTextEdit()
         self.input.setPlaceholderText("喂素材 —— 一句话 / 一个想法 / 一段原文都行（Ctrl+Enter）")
-        self.input.setFixedHeight(74)
+        self.input.setFixedHeight(104)
         v.addWidget(self.input)
         self._submit_fn = self._feed
         row = QHBoxLayout()
@@ -1649,7 +1649,7 @@ class Panel(QWidget):
         if not s.get("beats"):
             return
         pct = QLabel("≈ %d%%" % s["pct"])
-        pct.setStyleSheet("color:%s;font-size:11.5px;"
+        pct.setStyleSheet("color:%s;font-size:18px;"
                           "font-family:'Cascadia Mono','Consolas',monospace;" % FG3)
         pct.setToolTip("完成度估算 · 上限钉在 92%，最后一格由你点。")
         row.addWidget(pct)
@@ -1744,7 +1744,7 @@ class Panel(QWidget):
         head.setSpacing(8)
         head.addWidget(self._mk(("第 %d 段" % b["n"]) if placed else "还没编排", "gold"), 1)
         pill = QLabel(STXT.get(b["status"], ""))
-        pill.setStyleSheet("color:%s;font-size:11px;" % DOT.get(b["status"], FG3))
+        pill.setStyleSheet("color:%s;font-size:18px;" % DOT.get(b["status"], FG3))
         head.addWidget(pill)
         v.addLayout(head)
 
@@ -1762,7 +1762,7 @@ class Panel(QWidget):
             row.setSpacing(8)
             row.addWidget(self._lab(b["label"] or "（还没写）", "fg2"), 1)
             ebtn = self._btn("改措辞", "plain")
-            ebtn.setFixedWidth(60)
+            ebtn.setFixedWidth(84)
             ebtn.clicked.connect(lambda _, bid=b["id"]: self._edit_beat(bid))
             row.addWidget(ebtn)
             v.addLayout(row)
@@ -1777,7 +1777,7 @@ class Panel(QWidget):
         nrow.setSpacing(8)
         num = QLineEdit()
         num.setObjectName("editnum")
-        num.setFixedWidth(58)
+        num.setFixedWidth(84)
         num.setAlignment(Qt.AlignmentFlag.AlignCenter)
         num.setText(str(b["n"]) if placed else "")
         num.setPlaceholderText("第几位")
@@ -1832,7 +1832,7 @@ class Panel(QWidget):
         b.setObjectName("plain")
         b.setToolTip(tip)
         b.setCursor(Qt.CursorShape.PointingHandCursor)
-        b.setFixedWidth(52 if len(text) > 1 else 30)
+        b.setFixedWidth(72 if len(text) > 1 else 42)
         b.clicked.connect(handler)
         return b
 
@@ -1909,7 +1909,7 @@ class Panel(QWidget):
             row.setSpacing(8)
             row.addWidget(self._mat_line(m, 34), 1)
             bb = self._btn("指派到…")
-            bb.setFixedWidth(84)
+            bb.setFixedWidth(112)
             bb.clicked.connect(lambda _, mm=m: self._assign_menu(mm, bb))
             row.addWidget(bb)
             v.addLayout(row)
