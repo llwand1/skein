@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>task-orb 素材入口 Demo v0.1（喂 · 四物料 · 自由输入 · 快捷键）</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2a2f3a;
+    --fg:#e8eaf0; --fg2:#9aa3b2; --fg3:#69707e;
+    --accent:#FFD01F; --accent-ink:#1a1a1a;
+    --ok:#57a832; --warn:#E8A800; --danger:#FF6B6B; --blue:#5b9dff; --violet:#a78bfa;
+  }
+  html[data-theme="light"]{
+    --bg:#f3f4f6; --panel:#fff; --panel2:#eef0f3; --line:#e0e3e9;
+    --fg:#1c1c1e; --fg2:#5f6468; --fg3:#9599a1;
+    --accent:#E8A800; --ok:#3f8a20; --warn:#C98A00; --danger:#d94a4a; --blue:#2b6fd6; --violet:#7c5cf0;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+       font:14px/1.65 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;transition:background .2s,color .2s}
+  .wrap{max-width:1300px;margin:0 auto;padding:22px 20px 100px}
+  code,.mono{font-family:ui-monospace,Consolas,Menlo,monospace}
+  header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-bottom:16px;border-bottom:1px solid var(--line)}
+  header h1{font-size:18px;margin:0}
+  header .sub{color:var(--fg3);font-size:12px}
+  .spacer{flex:1}
+  button{font-family:inherit}
+  button.tgl{background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:12px}
+  button.tgl:hover{border-color:var(--accent)}
+  kbd{background:var(--panel2);border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:1px 7px;font-size:12px}
+  nav{display:flex;gap:6px;margin:18px 0 16px;flex-wrap:wrap}
+  nav button{background:transparent;color:var(--fg2);border:1px solid var(--line);border-radius:999px;padding:7px 15px;cursor:pointer;font-size:13px}
+  nav button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+  .panel{display:none}.panel.on{display:block}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px}
+  .card h2{margin:0 0 4px;font-size:15px}
+  .card .note{color:var(--fg3);font-size:12px;margin-bottom:12px}
+  .lead{background:var(--panel2);border-left:3px solid var(--accent);border-radius:0 10px 10px 0;padding:13px 16px;font-size:14.5px;line-height:1.8}
+  .lead b{color:var(--accent)}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:6px 0}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:var(--panel2);color:var(--fg2);font-weight:600}
+  .k{color:var(--fg3);font-size:12px}
+  .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;border:1px solid var(--line);color:var(--fg2);white-space:nowrap}
+  .tag.ok{border-color:var(--ok);color:var(--ok)}
+  .tag.new{border-color:var(--danger);color:var(--danger)}
+  .tag.warn{border-color:var(--warn);color:var(--warn)}
+  .tag.blue{border-color:var(--blue);color:var(--blue)}
+  .tag.violet{border-color:var(--violet);color:var(--violet)}
+  ul.tight{margin:8px 0;padding-left:20px}ul.tight li{margin:5px 0}
+  .verb{display:inline-block;background:var(--accent);color:var(--accent-ink);font-weight:800;padding:1px 10px;border-radius:8px;font-size:15px}
+
+  .walk{display:grid;grid-template-columns:1fr 330px;gap:14px;align-items:start}
+  @media(max-width:1000px){.walk{grid-template-columns:1fr}}
+  .guide{background:linear-gradient(180deg,rgba(255,208,31,.12),transparent);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:10px;padding:13px 16px;margin-bottom:14px}
+  .guide .stp{font-size:11.5px;font-weight:700;letter-spacing:.5px;color:var(--accent)}
+  .guide .ttl{font-size:16px;font-weight:700;margin:3px 0 5px}
+  .guide .dsc{font-size:13px;color:var(--fg2);line-height:1.7}
+  .guide .hint{margin-top:9px;font-size:12.5px;background:var(--panel2);border:1px dashed var(--line);border-radius:8px;padding:8px 11px}
+  .guide .hint b{color:var(--accent)}
+
+  .stage{position:relative;background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:16px;min-height:640px}
+  .mock{background:#fff;color:#1c1c1e;border:1px solid #e2e4ea;border-radius:10px;overflow:hidden;box-shadow:0 8px 26px rgba(0,0,0,.28)}
+  .titlebar{display:flex;align-items:center;gap:8px;padding:9px 12px;background:#f6f7f9;border-bottom:1px solid #e6e8ec}
+  .dot{width:10px;height:10px;border-radius:50%;background:#d5d8de}
+  .titlebar .url{margin-left:8px;font-size:12px;color:#8a9099}
+  .article{padding:14px 18px;font-size:14px;color:#2f343b;line-height:1.85;max-height:330px;overflow:auto;user-select:text}
+  .article h4{margin:0 0 10px;font-size:16px;color:#1c1c1e}
+  .article p{margin:0 0 11px}
+  .article .fake{color:#a4aab3;font-size:12px}
+
+  /* 网页里的可喂物料 */
+  .feedable{position:relative;margin:12px 0;border-radius:8px}
+  .feedable .grab{position:absolute;top:8px;right:8px;font-size:11.5px;background:#FFD01F;color:#1a1a1a;font-weight:700;
+                  border:0;border-radius:7px;padding:5px 10px;cursor:pointer;opacity:0;transition:opacity .15s;z-index:3}
+  .feedable:hover .grab{opacity:1}
+  .imgph{height:120px;border-radius:8px;background:
+      linear-gradient(135deg,#2b6fd6 0%,#57a832 45%,#E8A800 100%);
+      display:flex;align-items:center;justify-content:center;color:#fff;font-size:12.5px;letter-spacing:.6px}
+  .videoph{height:130px;border-radius:8px;background:#12141a;display:flex;align-items:center;justify-content:center;gap:12px;color:#cfd4dc}
+  .playdot{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.28);display:flex;align-items:center;justify-content:center}
+  .videoph .t{font-size:12.5px}
+  .vidtime{font-family:ui-monospace,Consolas,monospace;font-size:12px;background:rgba(0,0,0,.45);padding:1px 7px;border-radius:6px}
+
+  /* 悬浮球 */
+  .orb{position:absolute;right:20px;bottom:20px;width:74px;height:74px;border-radius:50%;
+       background:var(--panel);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;
+       cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.45);transition:transform .2s;z-index:6}
+  .orb:hover{transform:translateY(-2px)}
+  .orb .pct{position:absolute;font-size:12.5px;font-weight:800;font-family:ui-monospace,Consolas,monospace}
+  .orb svg{position:absolute;inset:0}
+  .orb .ring{stroke:var(--line)}.orb .arc{stroke:var(--accent);transition:stroke-dashoffset .5s}
+  .orb .badge{position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;border-radius:999px;background:var(--danger);color:#fff;
+              font-size:11px;font-weight:800;display:none;align-items:center;justify-content:center;padding:0 5px}
+  .orb .badge.on{display:flex}
+  .orb.ready{border-color:var(--accent);box-shadow:0 0 0 4px rgba(255,208,31,.18),0 8px 24px rgba(0,0,0,.45)}
+  .orb.pulse{animation:pl .7s ease 2}@keyframes pl{0%{transform:scale(1)}45%{transform:scale(1.14)}100%{transform:scale(1)}}
+  .orb.locked{opacity:.45;cursor:not-allowed}
+
+  /* 面板 */
+  .orbpanel{position:absolute;right:104px;bottom:20px;width:372px;background:var(--panel);border:1px solid var(--line);
+            border-radius:12px;padding:14px;box-shadow:0 12px 34px rgba(0,0,0,.5);display:none;z-index:6;max-height:78%;overflow:auto}
+  .orbpanel.on{display:block;animation:pop .18s ease}
+  @keyframes pop{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .ptitle{font-size:13.5px;font-weight:700}
+  .psub{font-size:11.5px;color:var(--fg3);margin:3px 0 10px}
+  .item{padding:8px;border-radius:8px;border:1px solid transparent}
+  .item.has{background:var(--panel2)}
+  .item .top{display:flex;gap:9px;align-items:flex-start}
+  .item .bx{width:17px;height:17px;border-radius:5px;border:1.6px dashed var(--line);flex:0 0 auto;margin-top:2px;display:flex;align-items:center;justify-content:center}
+  .item.has .bx{background:var(--accent);border-style:solid;border-color:var(--accent)}
+  .item .bx svg{display:none}.item.has .bx svg{display:block}
+  .item .nm{font-size:13px;font-weight:600}
+  .item .hn{display:block;font-size:11.5px;color:var(--fg3);font-weight:400}
+  .need{font-size:10.5px;color:var(--fg3);border:1px solid var(--line);border-radius:999px;padding:0 6px;margin-left:6px}
+  .mats{margin:7px 0 0 26px}
+  .mat{display:flex;gap:7px;font-size:11.5px;color:var(--fg2);background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:6px 8px;margin-bottom:5px}
+  .mat .ic{flex:0 0 auto;color:var(--accent)}
+  .mat .bd{flex:1;word-break:break-word}
+  .mat .mt{color:var(--fg3);font-size:10.5px;margin-top:2px}
+  .feedbtn{width:100%;margin-top:8px;padding:9px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--fg3);font-size:13px;cursor:not-allowed}
+  .feedbtn.ready{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700;cursor:pointer}
+
+  /* 自由输入框（面板内） */
+  .inbox{margin-top:10px;border-top:1px dashed var(--line);padding-top:10px}
+  .inbox .lab{font-size:11px;color:var(--fg3);margin-bottom:6px}
+  .inbox textarea{width:100%;min-height:52px;resize:vertical;background:var(--panel2);border:1px solid var(--line);border-radius:8px;
+                  color:var(--fg);font:12.5px/1.6 inherit;padding:8px}
+  .inbox textarea:focus{outline:0;border-color:var(--accent)}
+  .inbox .row{display:flex;gap:6px;margin-top:6px;align-items:center;flex-wrap:wrap}
+  .inbox .row .k{flex:1}
+  .minibtn{font-size:12px;padding:6px 11px;border-radius:7px;border:1px solid var(--line);background:var(--panel2);color:var(--fg);cursor:pointer}
+  .minibtn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
+
+  .pending{margin-top:10px;border-top:1px dashed var(--line);padding-top:9px}
+  .pending .hd{font-size:11px;color:var(--fg3);margin-bottom:6px}
+
+  .draftbox{margin-top:10px;border-top:1px dashed var(--line);padding-top:10px;display:none}
+  .draftbox.on{display:block}
+  .draftbox .dt{font-size:11px;color:var(--fg3);margin-bottom:6px}
+  .draftbox .d{font-size:12.5px;color:var(--fg2);white-space:pre-wrap;line-height:1.7}
+  .pubrow{margin-top:9px}
+  .pubrow button{font-size:12px;padding:6px 10px;border-radius:7px;border:1px solid var(--line);background:var(--panel2);color:var(--fg);margin:4px 5px 0 0;cursor:pointer}
+  .pubrow button:hover{border-color:var(--accent)}
+
+  /* 划选/喂 菜单 */
+  .feedmenu{position:absolute;width:270px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:11px;
+            box-shadow:0 12px 30px rgba(0,0,0,.55);display:none;z-index:9}
+  .feedmenu.on{display:block}
+  .feedmenu .fh{font-size:12px;font-weight:700;margin-bottom:6px}
+  .feedmenu .sel{font-size:11.5px;color:var(--fg2);background:var(--panel2);border-radius:6px;padding:6px 8px;margin-bottom:8px;max-height:70px;overflow:hidden;display:flex;gap:7px}
+  .feedmenu .sel .thumb{width:34px;height:34px;border-radius:6px;flex:0 0 auto;background:linear-gradient(135deg,#2b6fd6,#57a832)}
+  .feedmenu button.opt{display:flex;gap:7px;align-items:center;width:100%;text-align:left;font-size:12.5px;padding:7px 9px;margin-bottom:5px;
+                       border-radius:7px;border:1px solid var(--line);background:transparent;color:var(--fg);cursor:pointer}
+  .feedmenu button.opt:hover{border-color:var(--accent);background:var(--panel2)}
+  .feedmenu .pend{color:var(--fg2)}
+  .feedmenu .mfoot{font-size:10.5px;color:var(--fg3);margin-top:6px}
+
+  /* 快捷键浮窗 */
+  .hotkey{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:flex-start;justify-content:center;z-index:60;padding-top:14vh}
+  .hotkey.on{display:flex}
+  .hkwindow{width:min(560px,92vw);background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 24px 60px rgba(0,0,0,.6);overflow:hidden}
+  .hkbar{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--fg2)}
+  .hkbody{padding:14px}
+  .hkbody textarea{width:100%;min-height:74px;resize:vertical;background:var(--panel2);border:1px solid var(--line);border-radius:9px;
+                   color:var(--fg);font:13px/1.7 inherit;padding:10px}
+  .hkbody textarea:focus{outline:0;border-color:var(--accent)}
+  .hksrc{display:flex;gap:6px;margin-bottom:9px;flex-wrap:wrap}
+  .hksrc span{font-size:11.5px;border:1px solid var(--line);border-radius:999px;padding:2px 9px;color:var(--fg2)}
+  .hksrc span.on{border-color:var(--accent);color:var(--accent)}
+  .hkfoot{display:flex;gap:8px;align-items:center;padding:11px 14px;border-top:1px solid var(--line)}
+
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:var(--accent);color:var(--accent-ink);
+         font-weight:700;font-size:13px;padding:10px 18px;border-radius:999px;box-shadow:0 10px 30px rgba(0,0,0,.4);opacity:0;
+         pointer-events:none;transition:all .25s;z-index:70}
+  .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  .qbox{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+  .qbox h3{margin:0 0 10px;font-size:12.5px;color:var(--fg3)}
+  .q{display:flex;gap:9px;padding:9px 0;border-bottom:1px dashed var(--line)}
+  .q:last-child{border-bottom:0}
+  .q .lb{flex:0 0 62px;font-size:11.5px;font-weight:700;color:var(--accent);padding-top:2px}
+  .q .vv{font-size:12.5px;color:var(--fg2);flex:1}
+  .q .vv b{color:var(--fg)}
+  .loglist{list-style:none;margin:0;padding:0;max-height:240px;overflow:auto}
+  .loglist li{font-size:12.5px;color:var(--fg2);padding:7px 0;border-bottom:1px dashed var(--line);display:flex;gap:8px}
+  .loglist li .ck{color:var(--accent);font-weight:800;flex:0 0 auto}
+  .loglist .empty{color:var(--fg3);font-size:12px}
+  .reset{width:100%;margin-top:10px;padding:8px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--fg2);font-size:12.5px;cursor:pointer}
+  .reset:hover{border-color:var(--accent)}
+  footer{color:var(--fg3);font-size:12px;border-top:1px solid var(--line);margin-top:24px;padding-top:14px;line-height:1.8}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>task-orb 素材入口 Demo</h1>
+  <span class="sub">v0.1 ｜ 2026-10-09 ｜ 喂 · 四物料 · 自由输入 · 快捷键</span>
+  <span class="spacer"></span>
+  <button class="tgl" id="themeBtn">切换明暗</button>
+</header>
+
+<nav id="nav">
+  <button class="on" data-p="p0">0 · 一动作 × 四物料</button>
+  <button data-p="p1">1 · 交互走查（可点）</button>
+  <button data-p="p2">2 · 入口地图</button>
+  <button data-p="p3">3 · 三问自检</button>
+</nav>
+
+<!-- =============== 0 =============== -->
+<section class="panel on" id="p0">
+  <div class="card">
+    <h2>核心动作没变，还是「喂」；变的是它能接什么</h2>
+    <div class="note">上一版把「喂」做窄了，等于"划选文字"。这一版补齐：一个动词，四种物料，多个入口。</div>
+    <div class="lead">
+      <span class="verb">喂</span> ＝ <b>把眼前的东西交给这一期缺的那一项</b>。<br>
+      眼前的东西可以是：<b>一段文字、一张图、一段视频（带时间点）、或者你自己打的一句话</b>。<br>
+      <b>关键升级：勾 = 有素材。</b>你不能再空手打勾——没喂过东西的那一项就是"待喂"状态。<b>清单从此是一排等被喂的槽位，不是一张要你划勾的待办。</b>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>四种物料 × 各自入口 × 喂下去存什么</h2>
+    <table>
+      <thead><tr><th style="width:12%">物料</th><th style="width:34%">入口（怎么拿到）</th><th style="width:30%">喂下去存什么</th><th>没有它就会缺什么</th></tr></thead>
+      <tbody>
+        <tr><td><b>文字</b></td><td>网页里<b>划选</b>一段 / 复制后粘贴</td><td>原文 + 来源 URL + 时间</td><td>最基础的"可回源证据"</td></tr>
+        <tr><td><b>图片</b></td><td>悬停图片出现"喂这张图" / <b>截图</b> / 粘贴</td><td>图片本体 + 来源 + 时间</td><td>封面、对照图、教程截图</td></tr>
+        <tr><td><b>视频</b></td><td>悬停视频出现"喂这段视频" / 粘链接</td><td>链接 + <b>时间点(如 02:13)</b> + 封面</td><td>"看哪一段"的定位；否则素材等于没有</td></tr>
+        <tr><td><b>速记</b></td><td><b>自由输入框</b> / <b>全局快捷键</b>（demo 按 <kbd>F</kbd>）</td><td>你自己打的话（无来源也算数）</td><td>你在没网页可划选时闪过的想法</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>自由输入的入口在哪 —— 三个，覆盖三种场景</h2>
+    <table>
+      <thead><tr><th style="width:24%">入口</th><th style="width:24%">触发方式</th><th>什么时候用</th></tr></thead>
+      <tbody>
+        <tr><td><b>1 · 球面板底部输入框</b></td><td>点球 → 面板底部常驻输入区</td><td>你正在看清单，突然想到一句要补进去</td></tr>
+        <tr><td><b>2 · 全局快捷键</b></td><td>任何软件里按 <kbd>F</kbd>（真实产品里是可配置的全局热键）</td><td><b>不离开当前界面</b>就能记一句——这是"边工作边顺手记"的正解</td></tr>
+        <tr><td><b>3 · 划选浮层里的输入框</b></td><td>划选后，在浮层里补一句自己的话</td><td>既要原文，又想附上"我为什么觉得它有用"</td></tr>
+      </tbody>
+    </table>
+    <div class="k" style="margin-top:8px">三者共用同一个"喂"的下游（选目标项 → 存素材 → 推进进度），所以不增加学习成本——<b>只有入口多，动作仍是一个。</b></div>
+  </div>
+
+  <div class="card">
+    <h2>兜底：暂时不知道该喂给哪一项怎么办</h2>
+    <ul class="tight">
+      <li>喂的菜单里永远有最后一项：<b>「先存本期，稍后归类」</b>。</li>
+      <li>它进"本期暂存区"，不占进度；等你回看清单时再拖/点到具体项。</li>
+      <li>这条同时解决了 requirements §2.3 记的那类摩擦——"看到了但没喂"里，<b>"不知道该喂给哪一项"从此有地方可放</b>，不会被丢掉。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- =============== 1 走查 =============== -->
+<section class="panel" id="p1">
+  <div class="guide" id="guide">
+    <div class="stp" id="gStep">第 1 步 / 共 3 步</div>
+    <div class="ttl" id="gTitle">定这一期要做什么</div>
+    <div class="dsc" id="gDesc">先钉住这一期要发什么。定下来后，球会把"这一期要凑齐的素材"挂到角落。</div>
+    <div class="hint" id="gHint">点下面按钮开始：<b>「定这一期：E005 · MCP 创新在哪」</b></div>
+  </div>
+
+  <div class="walk">
+    <div class="stage" id="stage">
+      <div class="mock">
+        <div class="titlebar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="url">https://example-article.local/mcp-what-is-actually-new — 浏览器（模拟）</span>
+        </div>
+        <div class="article" id="article">
+          <h4>关于 MCP，真正新的那一点在哪</h4>
+          <p>很多人第一次看 MCP，会把它理解成"又一种函数调用"。这个理解不算错，但它解释不了一个事实：为什么大家已经能用 function calling 把模型接到自己的数据库上了，还非要再套一层协议。</p>
+
+          <div class="feedable" id="imgBlock">
+            <button class="grab" data-grab="image">喂这张图</button>
+            <div class="imgph">图 · 协议分层示意图（演示占位图）</div>
+          </div>
+
+          <p>真正的差别在于：协议把"发现能力"和"使用能力"这两件事标准化了。工具清单可以被询问、可以被列举、带着输入模式返回；宿主不必在编译期就知道世界上有哪些工具。</p>
+
+          <div class="feedable" id="vidBlock">
+            <button class="grab" data-grab="video">喂这段视频（02:13）</button>
+            <div class="videoph">
+              <span class="playdot"><svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg></span>
+              <span class="t">官方讲解录像（演示占位）</span>
+              <span class="vidtime">02:13</span>
+            </div>
+          </div>
+
+          <p>反过来看边界也清楚：它不负责模型好不好、不负责推理质量、也不替你做权限判断。把它当万能钥匙会失望，把它当"集成层的最小公约数"则刚好。</p>
+          <p class="fake">（演示用样张文本 + 占位图/视频，非引用真实来源。）</p>
+        </div>
+      </div>
+
+      <div style="margin-top:10px;font-size:12.5px;color:var(--fg3);text-align:center">
+        试：划选文字 / 悬停图片点「喂这张图」/ 悬停视频点「喂这段视频」/ 或在任意处按 <kbd>F</kbd> 唤起速记
+      </div>
+
+      <!-- 球 -->
+      <div class="orb locked" id="orb" title="点开本期清单">
+        <svg width="74" height="74" viewBox="0 0 74 74">
+          <circle class="ring" cx="37" cy="37" r="30" fill="none" stroke-width="3.4"/>
+          <circle class="arc" id="ringArc" cx="37" cy="37" r="30" fill="none" stroke-width="3.4" stroke-linecap="round"
+                  stroke-dasharray="188.5" stroke-dashoffset="188.5" transform="rotate(-90 37 37)"/>
+        </svg>
+        <span class="pct" id="orbPct">--</span>
+        <span class="badge" id="orbBadge">!</span>
+      </div>
+
+      <!-- 面板 -->
+      <div class="orbpanel" id="orbPanel">
+        <div class="ptitle"><span style="color:var(--accent)">E005 · MCP 到底创新在哪</span></div>
+        <div class="psub" id="taskSub">要凑齐 4 项（勾 = 已喂素材）· 目标：抖音图文 7 张</div>
+        <div id="itemList"></div>
+
+        <div class="pending" id="pendingWrap" style="display:none">
+          <div class="hd">本期暂存（还没归类）</div>
+          <div id="pendingList"></div>
+        </div>
+
+        <div class="inbox">
+          <div class="lab">自由输入 · 想到什么直接喂进来（不必有网页来源）</div>
+          <textarea id="noteInput" placeholder="例：封面用"它不是替代品"这句，配奶蛙 E0 看透一切的表情"></textarea>
+          <div class="row">
+            <span class="k">快捷键：任何地方按 <kbd>F</kbd> 也能唤起</span>
+            <button class="minibtn pri" id="noteFeedBtn">喂进去</button>
+          </div>
+        </div>
+
+        <button class="feedbtn" id="feedBtn" disabled>素材齐了，去准备发布</button>
+        <div class="draftbox" id="draftBox">
+          <div class="dt">AI 草稿建议（奶蛙语气 · 由已锁人设卡生成，非真实模型输出）</div>
+          <div class="d" id="draftText"></div>
+          <div class="dt" style="margin-top:9px">一键跳发布页 <span class="tag ok">= computer.open_url 现成能力</span></div>
+          <div class="pubrow">
+            <button data-pub="抖音创作服务平台">抖音创作发布</button>
+            <button data-pub="B站投稿页">B站投稿</button>
+            <button data-pub="小红书发布页">小红书发布</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 喂菜单 -->
+      <div class="feedmenu" id="feedMenu">
+        <div class="fh">把这份素材喂给哪一项？</div>
+        <div class="sel" id="selPreview"></div>
+        <div id="optList"></div>
+        <div class="mfoot">喂下去＝存素材 + 该项由"待喂"变"已喂"</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="qbox">
+        <h3>实时自答（用户视角）</h3>
+        <div class="q"><span class="lb">我在干什么</span><span class="vv" id="q1">还没开始。等你定这一期。</span></div>
+        <div class="q"><span class="lb">还差什么</span><span class="vv" id="q2">清单还没生成。</span></div>
+        <div class="q"><span class="lb">下一步</span><span class="vv" id="q3">点「定这一期」。</span></div>
+      </div>
+      <div class="qbox">
+        <h3>完成记录</h3>
+        <ul class="loglist" id="logList"><li class="empty">还没有完成任何动作。</li></ul>
+        <button class="reset" id="resetBtn">重来一遍</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =============== 2 入口地图 =============== -->
+<section class="panel" id="p2">
+  <div class="card">
+    <h2>一张图看清所有入口（都汇到同一个"喂"）</h2>
+    <div class="note">入口多，是为了"不管你在哪、手上有哪种物料，都能顺手记"；动作只有一个，所以学习成本不增加。</div>
+    <table>
+      <thead><tr><th style="width:16%">场景</th><th style="width:22%">入口</th><th style="width:14%">物料</th><th>动作</th></tr></thead>
+      <tbody>
+        <tr><td>在网页读到好句子</td><td>划选</td><td><span class="tag">文字</span></td><td>划一下 → 选一项</td></tr>
+        <tr><td>看到一张好图</td><td>悬停图片 → 「喂这张图」</td><td><span class="tag blue">图片</span></td><td>点一下 → 选一项</td></tr>
+        <tr><td>在某个视频里看到关键片段</td><td>悬停视频 → 「喂这段视频」</td><td><span class="tag violet">视频</span></td><td>点一下（自动带时间点）→ 选一项</td></tr>
+        <tr><td>图不方便抓（自绘界面/无右键）</td><td>系统截图 → 粘贴</td><td><span class="tag blue">图片</span></td><td>截图 → 粘贴到悬浮球/输入框</td></tr>
+        <tr><td>正在别的软件里干活，突然有想法</td><td><b>全局快捷键</b> <kbd>F</kbd></td><td><span class="tag warn">速记</span></td><td>按一下 → 打字 → 回车</td></tr>
+        <tr><td>想给素材补一句自己的判断</td><td>划选浮层里的输入框</td><td><span class="tag">文字+速记</span></td><td>划选 → 打字 → 选一项</td></tr>
+        <tr><td>不知道该喂给哪一项</td><td>喂菜单最后一项「先存本期」</td><td>任意</td><td>先存暂存区，稍后归类</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="card">
+    <h2>为什么不做成"万能收集箱"</h2>
+    <ul class="tight">
+      <li>万物皆可喂，但<b>喂的落点永远是"这一期缺的那一项"</b>——不是无限仓库。这挡住了它退化成又一个稍后读工具。</li>
+      <li>速记不强制选项：不确定就先暂存。但它<b>不占进度</b>，避免"存了一堆没归类"造成虚假的完成感。</li>
+      <li>视频必须带时间点：因为 P0 的验收是"攒齐的素材能直接进排版"，<b>只给一条链接等于没给</b>。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- =============== 3 三问自检 =============== -->
+<section class="panel" id="p3">
+  <div class="card">
+    <h2>UX 自检：三个最容易迷路的时刻</h2>
+    <table>
+      <thead><tr><th style="width:22%">迷路时刻</th><th style="width:30%">用户疑问</th><th>界面必须给出的答案</th></tr></thead>
+      <tbody>
+        <tr><td><b>刚装上，还没开始</b></td><td>"这是个啥？点哪里？"</td><td>一个起点按钮 + 一句话说清它会替你记什么；不必先建任务/看教程。</td></tr>
+        <tr><td><b>在网页上看到好素材（无论文字/图/视频）</b></td><td>"这段该怎么存进去？"</td><td>跨物料统一的手感：任何物料 hover/划选即出"喂"入口；喂完立刻回执。</td></tr>
+        <tr><td><b>手边没有网页，只有脑子里的想法</b></td><td>"我这一句记哪儿？"</td><td>全局快捷键 + 面板输入框，随时能打一句喂进去。</td></tr>
+        <tr><td><b>清单快满 / 满了</b></td><td>"快做完了吗？然后呢？"</td><td>未完成数常驻；全齐时球变色"可以发了"，给草稿 + 跳发布页。</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<footer>
+  task-orb 素材入口 Demo v0.1 ｜ 2026-10-09 ｜ 对象：<code>Desktop\task-orb\docs\requirements.md</code> v0.3.0 ｜
+  核心动作「喂」的物料/入口扩展仍受 §3 红线约束：发送永远真人、不引入平台私有协议。本页为可点击走查，非真机截图；图片/视频为 CSS 占位。单文件零依赖、无外链、无 emoji、可断网打开。
+</footer>
+
+</div>
+
+<!-- 快捷键浮窗 -->
+<div class="hotkey" id="hotkey">
+  <div class="hkwindow">
+    <div class="hkbar">
+      <b style="color:var(--fg)">喂给这一期</b>
+      <span>· E005 · MCP 到底创新在哪</span>
+      <span class="spacer"></span>
+      <span>按 <kbd>Esc</kbd> 关闭</span>
+    </div>
+    <div class="hkbody">
+      <div class="hksrc">
+        <span class="on">手打一句</span>
+        <span>选中的文字（若有）</span>
+        <span>剪贴板截图（若有）</span>
+      </div>
+      <textarea id="hkInput" placeholder="想到什么，直接打；回车喂进这一期…"></textarea>
+    </div>
+    <div class="hkfoot">
+      <span class="k" style="flex:1">这是"边干活边顺手记"的入口：不离开当前软件。</span>
+      <button class="minibtn" id="hkCancel">取消</button>
+      <button class="minibtn pri" id="hkOk">喂进去</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+  var $=function(id){return document.getElementById(id);};
+
+  $('themeBtn').addEventListener('click',function(){
+    var c=document.documentElement.getAttribute('data-theme');
+    document.documentElement.setAttribute('data-theme',c==='dark'?'light':'dark');
+  });
+  var nav=$('nav');
+  nav.addEventListener('click',function(e){
+    var b=e.target.closest('button'); if(!b) return;
+    [].forEach.call(nav.children,function(x){x.classList.remove('on');});
+    b.classList.add('on');
+    [].forEach.call(document.querySelectorAll('.panel'),function(p){p.classList.remove('on');});
+    $(b.dataset.p).classList.add('on');
+    window.scrollTo({top:0,behavior:'smooth'});
+  });
+
+  var CIRC=188.5;
+  var ICON={
+    text:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 11h16M4 16h10"/></svg>',
+    image:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-9 9"/></svg>',
+    video:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M10 9l5 3-5 3z"/></svg>',
+    note:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>'
+  };
+  var KNAME={text:'文字',image:'图片',video:'视频',note:'速记'};
+
+  var S={ started:false, items:[
+    {id:0,name:'一句话反常识结论', hint:'能让人站队的那种', need:'文字', mats:[]},
+    {id:1,name:'一张对照表素材',   hint:'它 vs 旧做法差在哪', need:'文字/图片', mats:[]},
+    {id:2,name:'一个可核实的真实现象',hint:'谁在用 / 官方原文片段', need:'文字/视频', mats:[]},
+    {id:3,name:'封面大字 + 奶蛙姿势', hint:'按 E0~E4 表情库挑一个', need:'图片', mats:[]}
+  ], pending:[], log:[] };
+
+  var orb=$('orb'),orbPct=$('orbPct'),orbBadge=$('orbBadge'),ringArc=$('ringArc'),panel=$('orbPanel'),
+      itemList=$('itemList'),feedBtn=$('feedBtn'),draftBox=$('draftBox'),draftText=$('draftText'),
+      stage=$('stage'),article=$('article'),feedMenu=$('feedMenu'),selPreview=$('selPreview'),optList=$('optList');
+
+  var CHECK='<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg>';
+
+  function doneCount(){ return S.items.filter(function(i){return i.mats.length>0;}).length; }
+  function now(){ var d=new Date(); function p(n){return (n<10?'0':'')+n;} return p(d.getHours())+':'+p(d.getMinutes()); }
+  function toast(m){ var t=$('toast'); t.textContent=m; t.classList.add('on'); clearTimeout(toast._t); toast._t=setTimeout(function(){t.classList.remove('on');},1900); }
+
+  function matHTML(m){
+    return '<div class="mat"><span class="ic">'+ICON[m.kind]+'</span><span class="bd">'
+      + '<span>['+KNAME[m.kind]+'] '+m.body+'</span>'
+      + '<span class="mt">'+(m.src?('来源 '+m.src+' · '):'')+m.time+'</span>'
+      + '</span></div>';
+  }
+
+  function renderItems(){
+    var h='';
+    S.items.forEach(function(it){
+      var has=it.mats.length>0;
+      h+='<div class="item'+(has?' has':'')+'">'
+        +  '<div class="top"><span class="bx">'+CHECK+'</span>'
+        +    '<span class="tx"><span class="nm">'+it.name+'<span class="need">需要 '+it.need+'</span>'
+        +    '<span class="hn">'+it.hint+'</span></span></span></div>'
+        +  (has?('<div class="mats">'+it.mats.map(matHTML).join('')+'</div>'):'');
+      h+='</div>';
+    });
+    itemList.innerHTML=h;
+    var pw=$('pendingWrap');
+    if(S.pending.length){
+      pw.style.display='block';
+      $('pendingList').innerHTML=S.pending.map(matHTML).join('');
+    } else { pw.style.display='none'; }
+  }
+
+  function renderOrb(){
+    var d=doneCount(), t=S.items.length, all=(d===t);
+    orbPct.textContent=d+'/'+t;
+    ringArc.setAttribute('stroke-dashoffset',String(CIRC-CIRC*d/t));
+    orb.classList.toggle('ready',all);
+    orbBadge.classList.toggle('on',!all && d>0);
+    orbBadge.textContent=String(t-d);
+    feedBtn.disabled=!all; feedBtn.classList.toggle('ready',all);
+    draftBox.classList.toggle('on',all);
+    if(all){
+      draftText.textContent='今天奶蛙给你讲清楚 MCP。\n封面大字候选：「它不是函数调用的替代品。」\n\n本期素材清单（按你喂进来的）：\n'
+        + S.items.map(function(i){
+            var m=i.mats[0];
+            return '· '+i.name+'：'+(m?('['+KNAME[m.kind]+'] '+m.body).slice(0,48):'（无）');
+          }).join('\n')
+        + (S.pending.length?('\n\n暂存待归类：'+S.pending.length+' 条'):'');
+    }
+  }
+
+  function renderLog(){
+    $('logList').innerHTML = S.log.length
+      ? S.log.map(function(x){return '<li><span class="ck">完成</span><span>'+x+'</span></li>';}).join('')
+      : '<li class="empty">还没有完成任何动作。</li>';
+  }
+
+  function guide(){
+    var d=doneCount(), t=S.items.length;
+    if(!S.started){
+      $('gStep').textContent='第 1 步 / 共 3 步';
+      $('gTitle').textContent='定这一期要做什么';
+      $('gDesc').textContent='先钉住这一期要发什么。定下来后，球会把"这一期要凑齐的素材"挂到角落。';
+      $('gHint').innerHTML='点下面按钮开始：<b>「定这一期：E005 · MCP 创新在哪」</b>';
+      $('q1').textContent='还没开始。等你定这一期。';
+      $('q2').textContent='清单还没生成。';
+      $('q3').innerHTML='点 <b>「定这一期」</b>。';
+      return;
+    }
+    if(d<t){
+      $('gStep').textContent='第 2 步 / 共 3 步';
+      $('gTitle').textContent='边浏览边干活，顺手把素材"喂"给它';
+      $('gDesc').textContent='手上是什么就喂什么：文字就划选、图片点"喂这张图"、视频点"喂这段视频"，没网页可划就按 F 打一句速记。喂下去＝存素材 + 那一项由"待喂"变"已喂"。';
+      $('gHint').innerHTML='随便试一种喂法 —— 还差 <b>'+(t-d)+'</b> 项。';
+      $('q1').innerHTML='在给「E005」攒素材（当前已喂 '+d+' 项）。';
+      $('q2').innerHTML='还差 <b>'+(t-d)+'</b> 项：'+S.items.filter(function(i){return i.mats.length===0;}).map(function(i){return i.name;}).join('、')+'。';
+      $('q3').innerHTML='划选 / 点图 / 点视频 / 按 <kbd>F</kbd> 记一句 → 选「喂给哪一项」。';
+      return;
+    }
+    $('gStep').textContent='第 3 步 / 共 3 步';
+    $('gTitle').textContent='喂满了 —— 球告诉你"可以发了"';
+    $('gDesc').textContent='4 项全部有素材，球变色并脉冲一次（只提醒一次）。点"去准备发布"，给你奶蛙语气草稿并跳各平台发布页。发送永远由你本人完成。';
+    $('gHint').innerHTML='点 <b>「素材齐了，去准备发布」</b>。';
+    $('q1').textContent='素材凑齐，进入"发布准备"。';
+    $('q2').innerHTML='<b>不差了</b>，4 项全有素材。';
+    $('q3').innerHTML='点 <b>「素材齐了，去准备发布」</b> 看草稿与发布页。';
+  }
+
+  function render(){ renderItems(); renderOrb(); renderLog(); guide(); }
+  function firePulse(){ orb.classList.remove('pulse'); void orb.offsetWidth; orb.classList.add('pulse'); }
+
+  /* ---- 开始 ---- */
+  var startBtn=document.createElement('button');
+  startBtn.textContent='定这一期：E005 · MCP 创新在哪';
+  startBtn.style.cssText='margin-top:10px;background:var(--accent);color:var(--accent-ink);border:1px solid var(--accent);font-weight:700;padding:8px 14px;font-size:13px;border-radius:8px;cursor:pointer;font-family:inherit';
+  startBtn.addEventListener('click',function(){
+    if(S.started) return;
+    S.started=true; orb.classList.remove('locked'); panel.classList.add('on');
+    S.log.push('定下这一期（E005 · MCP 创新在哪）'); render();
+    toast('已开始：球把这一期要凑的素材挂好了');
+  });
+  $('guide').appendChild(startBtn);
+
+  orb.addEventListener('click',function(e){
+    e.stopPropagation();
+    if(!S.started){ toast('先定这一期，球才会显示清单'); return; }
+    panel.classList.toggle('on');
+  });
+
+  /* ---- 喂菜单 ---- */
+  function hideMenu(){ feedMenu.classList.remove('on'); }
+  function openMenu(payload, rect){
+    selPreview.innerHTML=(payload.thumb?'<span class="thumb"></span>':'')
+      + '<span><b>['+KNAME[payload.kind]+']</b> '+(payload.body.length>70?payload.body.slice(0,70)+'…':payload.body)+'</span>';
+    var h='';
+    S.items.forEach(function(it){
+      h+='<button class="opt" data-i="'+it.id+'"><span>'+ICON[payload.kind]+'</span><span>喂给：'+it.name+'</span></button>';
+    });
+    h+='<button class="opt pend" data-i="-1"><span>'+ICON.note+'</span><span>先存本期，稍后归类</span></button>';
+    optList.innerHTML=h;
+    var srect=stage.getBoundingClientRect();
+    var top=rect.bottom-srect.top+8, left=rect.left-srect.left;
+    if(left+280>srect.width-12) left=srect.width-292;
+    if(left<12) left=12;
+    if(top+300>srect.height) top=Math.max(12,rect.top-srect.top-306);
+    feedMenu.style.top=top+'px'; feedMenu.style.left=left+'px';
+    feedMenu.classList.add('on');
+    feedMenu._payload=payload;
+  }
+
+  optList.addEventListener('click',function(e){
+    var b=e.target.closest('button.opt'); if(!b) return;
+    var p=feedMenu._payload, i=+b.dataset.i;
+    hideMenu();
+    if(i<0){
+      S.pending.push(p);
+      S.log.push('暂存素材 ['+KNAME[p.kind]+']（待归类）');
+      render(); toast('已存进本期暂存，稍后再归类');
+      return;
+    }
+    var it=S.items[i], first=(it.mats.length===0);
+    it.mats.push(p);
+    S.log.push('喂入 ['+KNAME[p.kind]+'] → '+it.name+(first?'（该项已完成）':'（追加）'));
+    render();
+    toast(first?('已完成：'+it.name):('已追加素材：'+it.name));
+    if(doneCount()===S.items.length) firePulse();
+  });
+
+  /* ---- 自动打勾：勾=有素材 ---- */
+
+  /* ---- 划选 ---- */
+  article.addEventListener('mouseup',function(e){
+    if(!S.started){ toast('先在左上角点「定这一期」'); return; }
+    if(e.target.closest('.feedable')) return;
+    var sel=window.getSelection(), txt=sel?String(sel).trim():'';
+    if(txt.length<6){ hideMenu(); return; }
+    var range=sel.getRangeAt(0);
+    openMenu({kind:'text',body:txt,src:'example-article.local/mcp',time:now()}, range.getBoundingClientRect());
+  });
+
+  /* ---- 图片 / 视频 ---- */
+  [].forEach.call(document.querySelectorAll('.grab'),function(btn){
+    btn.addEventListener('click',function(e){
+      e.stopPropagation();
+      if(!S.started){ toast('先在左上角点「定这一期」'); return; }
+      var kind=btn.dataset.grab;
+      var payload = kind==='image'
+        ? {kind:'image',body:'协议分层示意图（封面/对照图候选）',src:'example-article.local',time:now(),thumb:true}
+        : {kind:'video',body:'官方讲解录像 · 从 02:13 起（发现能力 vs 使用能力）',src:'video.example.local/watch',time:now(),thumb:true};
+      openMenu(payload, btn.getBoundingClientRect());
+    });
+  });
+
+  /* ---- 面板内自由输入 ---- */
+  function feedNote(text, fromHotkey){
+    text=(text||'').trim();
+    if(!text){ toast('先写点内容'); return; }
+    var rect;
+    if(fromHotkey) rect={bottom:window.innerHeight*0.45,left:window.innerWidth/2-135};
+    else rect=$('noteInput').getBoundingClientRect();
+    var payload={kind:'note',body:text,src:fromHotkey?'（快捷键速记）':'（面板速记）',time:now()};
+    if(fromHotkey){
+      // 浮层是 fixed，菜单也跟着放中心附近
+      openMenuFixed(payload);
+    } else {
+      openMenu(payload, rect);
+    }
+  }
+  function openMenuFixed(payload){
+    selPreview.innerHTML='<span class="thumb"></span><span><b>[速记]</b> '+(payload.body.length>70?payload.body.slice(0,70)+'…':payload.body)+'</span>';
+    var h='';
+    S.items.forEach(function(it){
+      h+='<button class="opt" data-i="'+it.id+'"><span>'+ICON.note+'</span><span>喂给：'+it.name+'</span></button>';
+    });
+    h+='<button class="opt pend" data-i="-1"><span>'+ICON.note+'</span><span>先存本期，稍后归类</span></button>';
+    optList.innerHTML=h;
+    feedMenu.style.position='fixed';
+    feedMenu.style.top='32vh'; feedMenu.style.left='calc(50% + 40px)';
+    feedMenu.classList.add('on');
+    feedMenu._payload=payload;
+  }
+  function resetMenuPos(){ feedMenu.style.position='absolute'; }
+
+  $('noteFeedBtn').addEventListener('click',function(){
+    if(!S.started){ toast('先定这一期'); return; }
+    feedNote($('noteInput').value,false); $('noteInput').value='';
+  });
+  $('noteInput').addEventListener('keydown',function(e){
+    if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); $('noteFeedBtn').click(); }
+  });
+
+  /* ---- 全局快捷键 F ---- */
+  function openHotkey(){
+    if(!S.started){ toast('先定这一期，再记速记'); return; }
+    resetMenuPos(); hideMenu();
+    $('hotkey').classList.add('on');
+    setTimeout(function(){ $('hkInput').focus(); },30);
+  }
+  function closeHotkey(){ $('hotkey').classList.remove('on'); $('hkInput').value=''; }
+  document.addEventListener('keydown',function(e){
+    var t=e.target, typing=(t && (t.tagName==='TEXTAREA'||t.tagName==='INPUT'));
+    if(e.key==='Escape'){ closeHotkey(); hideMenu(); return; }
+    if(typing) return;
+    if(e.key==='f'||e.key==='F'){ e.preventDefault(); openHotkey(); }
+  });
+  $('hkCancel').addEventListener('click',closeHotkey);
+  $('hkOk').addEventListener('click',function(){
+    var v=$('hkInput').value; closeHotkey(); feedNote(v,true);
+  });
+  $('hkInput').addEventListener('keydown',function(e){
+    if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); $('hkOk').click(); }
+  });
+  $('hotkey').addEventListener('mousedown',function(e){ if(e.target===$('hotkey')) closeHotkey(); });
+
+  /* ---- 发布 ---- */
+  feedBtn.addEventListener('click',function(){
+    if(feedBtn.disabled) return;
+    panel.classList.add('on'); draftBox.classList.add('on');
+    S.log.push('生成草稿建议（奶蛙语气）'); renderLog();
+    toast('已给出草稿建议，可跳各平台发布页');
+  });
+  [].forEach.call(document.querySelectorAll('.pubrow button'),function(b){
+    b.addEventListener('click',function(){
+      alert('演示环境不真的打开网页。\n\n真实实现调用 computer.open_url（app/desktop/native_tools.py:19-20）。\n\n目标：'+b.dataset.pub+'\n\n只打开发布页，发送永远由你本人完成（P-001 红线）。');
+    });
+  });
+
+  document.addEventListener('mousedown',function(e){
+    if(feedMenu.classList.contains('on') && feedMenu.style.position==='fixed'){
+      if(!feedMenu.contains(e.target)) hideMenu();
+      return;
+    }
+    if(!feedMenu.contains(e.target) && !article.contains(e.target)) hideMenu();
+  });
+
+  $('resetBtn').addEventListener('click',function(){
+    S.started=false; S.items.forEach(function(i){i.mats=[];}); S.pending=[]; S.log=[];
+    panel.classList.remove('on'); orb.classList.add('locked'); draftBox.classList.remove('on');
+    resetMenuPos(); hideMenu(); closeHotkey(); render(); toast('已重置，可以再走一遍');
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

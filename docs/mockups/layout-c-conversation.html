@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Skein 主排版 · C 会话优先（同类悬浮球）</title>
+<style>
+  :root{
+    --bg:#0e0c09; --card:#191612; --raise:#1e1a15; --sunken:#141110;
+    --hair:#2a241c; --hair2:#3c3427;
+    --fg:#f4ede1; --fg2:#b6ab97; --fg3:#7d7361;
+    --gold:#FFD01F; --green:#9ecf4e; --blue:#86b6e6;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#070605;color:var(--fg);font:12.5px/1.55 "Microsoft YaHei UI",sans-serif;
+       padding:32px;display:flex;gap:36px;align-items:flex-start}
+  .meta{width:330px;font-size:12px;color:var(--fg2)}
+  .meta h1{font-size:15px;color:var(--fg);margin-bottom:8px}
+  .meta h2{font:11px Consolas,monospace;letter-spacing:.6px;color:var(--fg3);margin:16px 0 4px}
+  .meta li{margin-left:16px;margin-bottom:3px}
+  .meta code{color:var(--gold);font-family:Consolas,monospace}
+
+  .stage{position:relative;padding-right:120px}
+  /* 悬浮球：和面板同一套材质，右下角钉着 */
+  .orb{position:absolute;right:0;top:210px;width:92px;height:92px;border-radius:50%;
+       background:radial-gradient(circle at 32% 26%, rgba(255,255,255,.20), rgba(120,132,160,.10) 45%, rgba(14,16,23,.55) 100%);
+       border:1px solid rgba(255,255,255,.18);
+       box-shadow:0 18px 40px rgba(0,0,0,.75), inset 0 0 24px rgba(255,255,255,.06);
+       display:grid;place-items:center}
+  .orb i{width:62px;height:62px;border-radius:50%;border:6px solid #2f3446;
+         border-top-color:var(--gold);border-right-color:var(--gold);
+         border-bottom-color:var(--gold);transform:rotate(35deg)}
+
+  .panel{width:520px;border-radius:14px;background:var(--card);overflow:hidden;
+         box-shadow:0 28px 70px rgba(0,0,0,.75);position:relative}
+
+  /* 会话头：球 + 期名 + 副状态；动作收成右侧四个小图标（同类产品的通用做法） */
+  .shead{display:flex;align-items:center;gap:10px;padding:12px 14px 11px;
+         border-bottom:1px solid var(--hair)}
+  .avatar{width:26px;height:26px;border-radius:50%;border:2.5px solid #2f3446;
+          border-top-color:var(--gold);border-right-color:var(--gold);flex:none}
+  .ttl{flex:1;min-width:0}
+  .ttl b{display:block;font-size:14px;font-weight:600}
+  .ttl span{display:block;font-size:11px;color:var(--fg3)}
+  .pill{font:11px Consolas,monospace;color:var(--gold);border:1px solid #5d4e17;
+        border-radius:99px;padding:2px 9px;flex:none}
+  .icon{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;
+        color:var(--fg3);cursor:pointer;flex:none}
+  .icon:hover{background:var(--raise);color:var(--fg)}
+
+  /* 长对话流：气泡分层（你暖底靠右 / AI 冷底靠左），每条可复制 */
+  .flow{padding:14px 14px 4px;max-height:330px;overflow:auto}
+  .line{display:flex;gap:6px;margin-bottom:12px}
+  .line.you{justify-content:flex-end}
+  .av{width:20px;height:20px;border-radius:6px;flex:none;display:grid;place-items:center;
+      font:600 10px Consolas,monospace;margin-top:2px}
+  .line.ai .av{background:#1b2430;color:var(--blue)}
+  .col{max-width:404px;display:flex;flex-direction:column;gap:4px}
+  .line.you .col{align-items:flex-end}
+  .who{font:10.5px Consolas,monospace;color:var(--fg3);display:flex;gap:6px;align-items:center}
+  .who span{opacity:.55;cursor:pointer}
+  .bub{border-radius:12px;padding:8px 11px;border:1px solid var(--hair)}
+  .line.ai .bub{background:var(--raise)}
+  .line.you .bub{background:#251f0e;border-color:#4d4013}
+  .bub p{color:var(--fg2)}
+  .chips{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+  .chip{font-size:11px;color:var(--fg3);border:1px solid var(--hair2);border-radius:99px;
+        padding:2px 9px;cursor:pointer}
+  .chip:hover{color:var(--fg);border-color:#4d4013}
+  .act{display:flex;gap:6px;align-items:center;margin-top:8px}
+  .act em{font-style:normal;font-size:11px;color:var(--fg3)}
+  .act button{font:600 11.5px inherit;color:var(--gold);background:transparent;
+              border:1px solid #5d4e17;border-radius:7px;padding:3px 10px;cursor:pointer}
+  .sys{color:var(--fg3);font-size:11.5px;padding:0 4px 10px}
+  .busy{color:var(--gold);font-size:11.5px;padding:0 4px 10px}
+
+  /* composer：输入框 + 左侧图标行（＋喂 / 搜索 / 池子）—— 入口贴着对话，不另占一行 */
+  .composer{padding:10px 14px 14px;border-top:1px solid var(--hair)}
+  .box{background:var(--sunken);border:1px solid var(--hair2);border-radius:11px;padding:9px 11px}
+  .box .ph{color:var(--fg3);height:22px}
+  .box .foot{display:flex;align-items:center;gap:6px;margin-top:6px}
+  .mini{font-size:11.5px;color:var(--fg2);border-radius:7px;padding:3px 9px;cursor:pointer;
+        border:1px solid transparent}
+  .mini:hover{background:var(--raise);color:var(--fg);border-color:var(--hair2)}
+  .mini.on{color:var(--gold);border-color:#5d4e17}
+  .foot .sp{flex:1}
+  .send{font:600 12.5px inherit;color:#1a160d;background:var(--gold);border:0;border-radius:8px;
+        padding:6px 13px;cursor:pointer}
+
+  /* 抽屉：从底部升起的浮层卡片（示意） */
+  .drawer{margin:0 14px 14px;background:#1b1712;border:1px solid var(--hair2);border-radius:11px;
+          padding:11px 12px;box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+  .drawer h4{font:11px Consolas,monospace;letter-spacing:.6px;color:var(--fg3);margin-bottom:8px}
+  .drawer .r{display:flex;align-items:center;gap:8px;padding:5px 0}
+  .drawer .r p{flex:1;color:var(--fg2);font-size:12px}
+  .drawer .r b{font:11px Consolas,monospace;color:var(--fg3);border:1px solid var(--hair2);
+               border-radius:6px;padding:2px 8px;cursor:pointer;font-weight:400}
+</style>
+</head>
+<body>
+  <div class="meta">
+    <h1>C · 会话优先（同类悬浮球）</h1>
+    <h2>规矩</h2>
+    <ul>
+      <li><b>会话头</b>：球 + 期名 + 副状态；动作收成右侧 4 个小图标</li>
+      <li>完成度收成一枚 <code>pill</code>，挂在会话头右边（不再占一行）</li>
+      <li>主体 = <b>长对话流</b>：你暖底靠右 / AI 冷底靠左，每条可复制</li>
+      <li><b>入口贴着对话</b>：＋喂 / 搜索 / 池子 塞进 composer 左上角</li>
+      <li>抽屉不做成"卡片段落"，做成<b>底部升起的浮层</b></li>
+      <li>和球同一套材质（暗玻璃 + 金）</li>
+    </ul>
+    <h2>换取</h2>
+    <ul><li>最像"产品"，对话是主角、最有人味</li><li>但首屏会少看见结构（池子/提议藏在入口后）</li></ul>
+  </div>
+
+  <div class="stage">
+    <div class="panel">
+      <div class="shead">
+        <i class="avatar"></i>
+        <div class="ttl"><b>MCP 到底创新在哪</b><span>图文 · 目标 7 张 · 本地规则</span></div>
+        <span class="pill">≈ 25%</span>
+        <span class="icon">＋</span><span class="icon">⌕</span><span class="icon">◎</span><span class="icon">×</span>
+      </div>
+
+      <div class="flow">
+        <div class="line you">
+          <div class="col">
+            <div class="who">你 <span>⧉</span></div>
+            <div class="bub"><p>我想从「成本」这个角度切，别讲协议细节。</p></div>
+          </div>
+        </div>
+        <div class="line ai">
+          <div class="av">AI</div>
+          <div class="col">
+            <div class="who">AI <span>⧉</span></div>
+            <div class="bub">
+              <p>行，这条线可以。但先说清一件事：这里的成本是接入成本与维护成本，不是算力钱。</p>
+              <div class="chips"><span class="chip">打开 modelcontextprotocol.io</span></div>
+              <div class="act"><em>要动：第 1 段改成「接入成本到底卡在哪？」</em><button>照做</button></div>
+            </div>
+          </div>
+        </div>
+        <div class="busy">AI 正在想…</div>
+        <div class="sys">· 模型没接上（看标题栏那行状态），所以这句没人回。</div>
+      </div>
+
+      <div class="composer">
+        <div class="box">
+          <div class="ph">和它说点什么…（Enter 换行，Ctrl+Enter 发送）</div>
+          <div class="foot">
+            <span class="mini on">＋ 喂</span><span class="mini">搜索</span><span class="mini">池子 3</span>
+            <span class="sp"></span><span class="send">说给它</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="drawer">
+        <h4>未指派素材 · 2</h4>
+        <div class="r"><p>［速记］MCP 到底新在哪</p><b>指派到…</b></div>
+        <div class="r"><p>［链接］MCP 为什么需要：从 N×M 到 N+M</p><b>打开源</b></div>
+      </div>
+    </div>
+    <i class="orb"><i></i></i>
+  </div>
+</body>
+</html>

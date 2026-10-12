@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Skein 主排版 · B 克制（Raycast 式）</title>
+<style>
+  :root{
+    --bg:#0e0c09; --card:#17140f; --sunken:#120f0c;
+    --hair:#241f18; --hair2:#332c23;
+    --fg:#f0e9dc; --fg2:#a89e8c; --fg3:#6f6656;
+    --gold:#FFD01F; --blue:#86b6e6;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#070605;color:var(--fg);font:12.5px/1.5 "Microsoft YaHei UI",sans-serif;
+       padding:32px;display:flex;gap:36px;align-items:flex-start}
+  .meta{width:330px;font-size:12px;color:var(--fg2)}
+  .meta h1{font-size:15px;color:var(--fg);margin-bottom:8px}
+  .meta h2{font:11px Consolas,monospace;letter-spacing:.6px;color:var(--fg3);margin:16px 0 4px}
+  .meta li{margin-left:16px;margin-bottom:3px}
+  .meta code{color:var(--gold);font-family:Consolas,monospace}
+
+  /* 一条 2px 的进度，贴在面板最上沿 —— 不占任何版面 */
+  .panel{width:460px;border-radius:10px;background:var(--card);overflow:hidden;
+         box-shadow:0 24px 60px rgba(0,0,0,.75);position:relative}
+  .meter{position:absolute;inset:0 0 auto 0;height:2px;background:#221e18}
+  .meter i{display:block;height:100%;width:25%;background:linear-gradient(90deg,#E8A800,#FFD01F)}
+
+  .top{display:flex;align-items:center;gap:8px;height:38px;padding:0 14px;
+       border-bottom:1px solid var(--hair)}
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--gold)}
+  .top .name{font-weight:600}
+  .top .topic{color:var(--fg3)}
+  .top .sp{flex:1}
+  .top .st{font:10.5px Consolas,monospace;color:var(--fg3)}
+  .x{color:var(--fg3);cursor:pointer;font-size:14px}
+
+  /* 动作条 = 一行小按钮，高度 24，无边框，hover 才有面 */
+  .rail{display:flex;align-items:center;gap:4px;padding:8px 10px;border-bottom:1px solid var(--hair)}
+  .b{font-size:11.5px;color:var(--fg2);border-radius:6px;padding:3px 9px;cursor:pointer}
+  .b:hover{background:#221e18;color:var(--fg)}
+  .b.on{background:#2a2410;color:var(--gold)}
+  .rail .sp{flex:1}
+  .capbtn{font:700 12px inherit;color:var(--gold);border:1px solid #5d4e17;border-radius:6px;
+          padding:2px 8px;cursor:pointer}
+
+  /* 对话：没有气泡。角色只一个小写标，消息之间 1px 分割，密度最大 */
+  .stream{padding:4px 14px 0}
+  .msg{padding:10px 0;border-bottom:1px solid var(--hair)}
+  .msg:last-of-type{border-bottom:0}
+  .role{font:10.5px Consolas,monospace;letter-spacing:.5px;color:var(--fg3);margin-bottom:4px;
+        display:flex;align-items:center;gap:6px}
+  .msg.you .role{color:var(--gold)}
+  .msg.ai .role{color:var(--blue)}
+  .role span{margin-left:auto;opacity:.55;cursor:pointer;letter-spacing:0}
+  .msg p{color:var(--fg2)}
+  .lnk{display:inline-block;margin-top:6px;font-size:11px;color:var(--fg3);
+       border-bottom:1px dashed var(--hair2);cursor:pointer}
+  .do{margin-top:8px;display:flex;align-items:center;gap:8px}
+  .do em{font-style:normal;font-size:11px;color:var(--fg3);flex:1}
+  .do button{font:600 11.5px inherit;color:var(--gold);background:transparent;
+             border:1px solid #5d4e17;border-radius:6px;padding:3px 10px;cursor:pointer}
+  .hint{padding:8px 14px;font-size:11.5px;color:var(--fg3)}
+
+  /* composer 是主角：一整条，左右两端放东西 —— Raycast 的"输入即命令" */
+  .cmd{margin:8px 10px 10px;background:var(--sunken);border:1px solid var(--hair2);
+       border-radius:9px;padding:9px 11px}
+  .cmd .ph{color:var(--fg3);font-size:12px;height:20px}
+  .cmd .foot{display:flex;align-items:center;gap:6px;margin-top:6px}
+  .ico{width:20px;height:20px;border-radius:5px;display:grid;place-items:center;
+       background:#1d1913;color:var(--fg3);font-size:11px;cursor:pointer}
+  .ico:hover{color:var(--fg)}
+  .foot .sp{flex:1}
+  .kbd{font:10px Consolas,monospace;color:var(--fg3)}
+</style>
+</head>
+<body>
+  <div class="meta">
+    <h1>B · 克制（Raycast 式）</h1>
+    <h2>规矩</h2>
+    <ul>
+      <li>面板压到 <code>460</code>，行高更紧，一屏装下全部</li>
+      <li>进度做成<b>顶部 2px 线</b> —— 不占任何版面</li>
+      <li>动作条 = 一行 <code>24px</code> 小按钮，<b>无边框</b>，hover 才有面</li>
+      <li>对话<b>不做气泡</b>：小写标 + 1px 分割线，密度最大</li>
+      <li><b>composer 是主角</b>：输入即命令，左右两端放图标</li>
+      <li>全屏只有 1 处暖色：主按钮 / 当前项</li>
+    </ul>
+    <h2>换取</h2>
+    <ul><li>最"快"、最不像网页表单</li><li>但亲和力最低，气泡的"人味"没了</li></ul>
+  </div>
+
+  <div class="panel">
+    <div class="meter"><i></i></div>
+    <div class="top">
+      <i class="dot"></i><span class="name">Skein</span><span class="topic">MCP 到底创新在哪</span>
+      <span class="sp"></span><span class="st">本地规则</span><span class="x">×</span>
+    </div>
+    <div class="rail">
+      <span class="b on">＋ 喂</span><span class="b">搜索</span>
+      <span class="b">池子 3</span><span class="b">提议 1</span>
+      <span class="sp"></span><span class="capbtn">✓ 收口</span>
+    </div>
+    <div class="stream">
+      <div class="msg you">
+        <div class="role">你<span>⧉</span></div>
+        <p>我想从「成本」这个角度切，别讲协议细节。</p>
+      </div>
+      <div class="msg ai">
+        <div class="role">AI<span>⧉</span></div>
+        <p>行，这条线可以。但先说清一件事：这里的成本是接入成本与维护成本，不是算力钱。</p>
+        <span class="lnk">打开 modelcontextprotocol.io</span>
+        <div class="do"><em>要动：第 1 段改成「接入成本到底卡在哪？」</em><button>照做</button></div>
+      </div>
+    </div>
+    <div class="hint">→ 补第 2 段：把「MCP」想简单，最容易在哪翻车？ · AI 正在想…</div>
+    <div class="cmd">
+      <div class="ph">和它说点什么…</div>
+      <div class="foot">
+        <span class="ico">＋</span><span class="ico">⌕</span><span class="ico">◎</span>
+        <span class="sp"></span><span class="kbd">Ctrl+Enter 发送</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

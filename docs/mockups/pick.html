@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Skein 主排版 · 选一版</title>
+<style>
+:root{
+  --bg:#0e0c09; --panel:#141210; --raise:#1b1814; --raise2:#221e19;
+  --hair:#2b251d; --hair2:#3a3226;
+  --fg:#f4ede1; --fg2:#b6ab97; --fg3:#807664; --fg4:#5d5548;
+  --gold:#FFD01F;
+  --you:#251f0e; --youbr:#4d4013;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--fg);
+  font:13px/1.62 -apple-system,"Segoe UI Variable Text","Segoe UI","Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+/* ---------- 假桌面：只为让面板看起来像"漂浮的真产品" ---------- */
+.desk{position:fixed;inset:0;z-index:-1;
+  background:
+    radial-gradient(1100px 620px at 74% 8%, #1c1710 0%, rgba(28,23,16,0) 62%),
+    radial-gradient(900px 520px at 14% 96%, #161310 0%, rgba(22,19,16,0) 60%),
+    linear-gradient(180deg,#0b0a08,#0e0c09 40%,#0a0908)}
+.desk::before{content:"";position:absolute;inset:0;opacity:.5;
+  background-image:linear-gradient(rgba(255,255,255,.014) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(255,255,255,.014) 1px,transparent 1px);
+  background-size:44px 44px}
+.desk::after{content:"";position:absolute;left:-40px;right:-40px;bottom:14%;height:340px;
+  background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,0));
+  border-radius:24px;filter:blur(2px)}
+/* ---------- 顶部：换版器 ---------- */
+.top{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;
+  padding:12px 18px;background:rgba(14,12,9,.9);backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--hair)}
+.seg{display:flex;gap:2px;padding:3px;background:#171410;border:1px solid var(--hair);border-radius:11px}
+.seg button{appearance:none;border:0;cursor:pointer;background:transparent;color:var(--fg3);
+  font:inherit;font-size:12.5px;padding:5px 13px;border-radius:8px;transition:.16s}
+.seg button:hover{color:var(--fg2)}
+.seg button.on{background:#2a2418;color:var(--gold);box-shadow:inset 0 0 0 1px #6b5a1c}
+.hint{color:var(--fg3);font-size:12.5px}
+.hint b{color:var(--fg2);font-weight:600}
+kbd{border:1px solid var(--hair2);border-bottom-width:2px;border-radius:5px;padding:0 5px;
+  font:600 10.5px/16px ui-monospace,Consolas,monospace;color:var(--fg2)}
+/* ---------- 舞台 ---------- */
+.stage{display:flex;flex-direction:column;align-items:center;gap:14px;
+  padding:30px 26px 34px;overflow-x:auto}
+.ver{display:none}
+body[data-v="a"] .ver[data-v="a"],
+body[data-v="b"] .ver[data-v="b"],
+body[data-v="c"] .ver[data-v="c"]{display:flex;flex-direction:column;align-items:center;gap:14px;
+  animation:in .3s cubic-bezier(.22,.7,.3,1)}
+@keyframes in{from{opacity:0;transform:translateY(7px) scale(.994)}to{opacity:1;transform:none}}
+.wrap{position:relative}
+.note{color:var(--fg3);font-size:12px;text-align:center;max-width:560px}
+.note b{color:var(--fg2);font-weight:600}
+/* ---------- 悬浮球 ---------- */
+.orbwrap{position:absolute;right:-26px;bottom:-26px;width:46px;height:46px}
+.orb{width:46px;height:46px;border-radius:50%;
+  background:radial-gradient(circle at 33% 27%,#fff8e0 0%,#FFD01F 24%,#c9940a 58%,#4a3607 82%,#241a04 100%);
+  box-shadow:0 0 0 1px rgba(255,208,31,.34),0 10px 26px rgba(255,208,31,.2),
+             inset 0 2px 7px rgba(255,255,255,.4),inset 0 -6px 12px rgba(0,0,0,.45);
+  position:relative}
+.orb::after{content:"";position:absolute;left:11px;top:7px;width:14px;height:9px;border-radius:50%;
+  background:linear-gradient(180deg,rgba(255,255,255,.85),rgba(255,255,255,0));filter:blur(1.4px)}
+.ring{position:absolute;inset:-5px;animation:spin 14s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* ---------- 面板通用 ---------- */
+.panel{position:relative;background:linear-gradient(180deg,#161412,#121010);
+  border:1px solid var(--hair2);border-radius:15px;overflow:hidden;
+  box-shadow:0 26px 60px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.035)}
+.ico{width:15px;height:15px;flex:none;stroke:currentColor;stroke-width:1.6;fill:none;
+  stroke-linecap:round;stroke-linejoin:round}
+.icobtn{display:inline-flex;align-items:center;justify-content:center;gap:5px;cursor:pointer;
+  background:transparent;border:0;color:var(--fg3);font:inherit;font-size:12px;
+  border-radius:8px;padding:4px 7px;transition:.15s}
+.icobtn:hover{color:var(--fg);background:rgba(255,255,255,.045)}
+.label{font-size:10px;letter-spacing:.1em;color:var(--fg4);text-transform:uppercase}
+.dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--gold);
+  box-shadow:0 0 8px rgba(255,208,31,.6)}
+.typing::after{content:"";display:inline-block;width:3px;height:11px;margin-left:3px;
+  background:var(--gold);vertical-align:-1px;animation:blink 1.05s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+.linkrow{margin-top:7px;display:flex;flex-wrap:wrap;gap:6px}
+.alink{display:inline-flex;align-items:center;gap:5px;text-decoration:none;cursor:pointer;
+  color:var(--fg2);font-size:11.5px;padding:3px 9px;border-radius:999px;
+  border:1px solid var(--hair2);background:#17140f;transition:.15s}
+.alink:hover{color:var(--gold);border-color:#6b5a1c}
+.alink .dom{color:var(--fg);opacity:.85}
+.actrow{margin-top:8px;display:flex;align-items:center;gap:8px}
+.actrow .why{color:var(--fg3);font-size:11.5px;flex:1;min-width:0}
+.gbtn{cursor:pointer;font:inherit;font-size:11.5px;font-weight:600;padding:3px 11px;border-radius:8px;
+  color:var(--gold);background:rgba(255,208,31,.07);border:1px solid #6b5a1c;transition:.15s}
+.gbtn:hover{background:rgba(255,208,31,.15)}
+.plain{cursor:pointer;font:inherit;font-size:11.5px;color:var(--fg3);background:transparent;
+  border:1px solid var(--hair2);border-radius:8px;padding:3px 9px;transition:.15s}
+.plain:hover{color:var(--fg2)}
+/* ================================================================
+   A · 纪律（Linear 式）：4 档字号 / 发丝线分层 / 不用气泡
+   ================================================================ */
+.pa{width:520px;padding:0 0 2px}
+.pa .hd{padding:15px 18px 11px}
+.pa .t1{display:flex;align-items:center;gap:9px}
+.pa .t1 .nm{font-size:15px;font-weight:600;letter-spacing:-.01em;flex:1;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pa .pct{font:600 11px/1 ui-monospace,Consolas,monospace;color:var(--gold);
+  border:1px solid #6b5a1c;border-radius:999px;padding:4px 8px}
+.pa .sub{margin-top:5px;font-size:11.5px;color:var(--fg4)}
+.pa .cmd{display:flex;gap:10px;padding:11px 18px;border-top:1px solid var(--hair);
+  border-bottom:1px solid var(--hair);background:rgba(255,255,255,.012)}
+.pa .cmd .bar{width:2px;background:var(--gold);border-radius:2px;flex:none}
+.pa .cmd .tx{font-size:13px;color:var(--fg);flex:1;min-width:0}
+.q{width:15px;height:15px;flex:none;border:1px solid var(--hair2);border-radius:50%;
+  color:var(--fg4);font-size:9.5px;display:flex;align-items:center;justify-content:center;cursor:help}
+.pa .acts{display:flex;align-items:center;gap:4px;padding:8px 14px;border-bottom:1px solid var(--hair)}
+.pa .acts .sp{flex:1}
+.pa .cap{display:inline-flex;align-items:center;gap:5px;cursor:pointer;font:700 11.5px/1 inherit;
+  color:var(--gold);background:rgba(255,208,31,.07);border:1px solid #6b5a1c;border-radius:8px;padding:5px 10px}
+.pa .conv{padding:4px 18px 10px}
+.pa .turn{padding:11px 0 11px 12px;border-left:1px solid var(--hair)}
+.pa .turn+.turn{border-top:0}
+.pa .turn .who{font-size:10px;letter-spacing:.09em;color:var(--fg4);text-transform:uppercase;margin-bottom:5px}
+.pa .turn.you .who{color:#8a7742}
+.pa .turn .bd{font-size:13px;color:var(--fg2)}
+.pa .turn.you .bd{color:var(--fg)}
+.pa .turn.ai .bd{color:var(--fg2)}
+.pa .composer{display:flex;align-items:center;gap:10px;padding:12px 18px;border-top:1px solid var(--hair);background:#131110}
+.pa .composer .ph{flex:1;color:var(--fg4);font-size:13px}
+.pa .composer .k{font-size:10.5px;color:var(--fg4);font-family:ui-monospace,Consolas,monospace}
+.pa .foot{display:flex;align-items:center;gap:8px;padding:9px 18px 12px;color:var(--fg4);font-size:11.5px}
+/* ================================================================
+   B · 克制（Raycast 式）：460 / 顶部 2px 进度线 / 24px 小按钮 / 不做气泡
+   ================================================================ */
+.pb{width:460px}
+.pb .pbar{position:absolute;top:0;left:0;height:2px;width:25%;background:var(--gold);
+  box-shadow:0 0 10px rgba(255,208,31,.5)}
+.pb .hd{display:flex;align-items:center;gap:8px;padding:13px 13px 11px}
+.pb .orbm{width:16px;height:16px;border-radius:50%;flex:none;
+  background:radial-gradient(circle at 34% 28%,#fff8e0,#FFD01F 45%,#8a6608)}
+.pb .nm{font-size:13px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pb .hd .icobtn{padding:3px 5px}
+.pb .row{display:flex;align-items:center;gap:3px;padding:6px 10px;border-bottom:1px solid var(--hair)}
+.pb .sq{width:24px;height:24px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;
+  cursor:pointer;color:var(--fg3);background:transparent;border:0;transition:.15s}
+.pb .sq:hover{background:rgba(255,255,255,.05);color:var(--fg)}
+.pb .row .sp{flex:1}
+.pb .cap24{height:24px;display:inline-flex;align-items:center;gap:5px;cursor:pointer;
+  font:700 11.5px/1 inherit;color:var(--gold);border:1px solid #6b5a1c;border-radius:7px;padding:0 9px;
+  background:rgba(255,208,31,.07)}
+.pb .conv{padding:8px 13px 12px}
+.pb .blk{padding:10px 0}
+.pb .blk+.blk{border-top:1px solid var(--hair)}
+.pb .who{font-size:10px;letter-spacing:.11em;color:var(--fg4);text-transform:uppercase;margin-bottom:4px}
+.pb .blk.you .bd{font-size:13px;color:var(--fg)}
+.pb .blk.ai .bd{font-size:13px;color:var(--fg2)}
+.pb .composer{margin:0 13px 12px;border:1px solid var(--hair2);border-radius:11px;background:#17140f;
+  padding:9px 11px 8px;display:flex;flex-direction:column;gap:7px}
+.pb .composer .ph{font-size:13px;color:var(--fg4)}
+.pb .composer .brow{display:flex;align-items:center;gap:2px}
+.pb .composer .sp{flex:1}
+.pb .foot{display:flex;align-items:center;gap:7px;padding:0 13px 13px;color:var(--fg4);font-size:11.5px}
+/* ================================================================
+   C · 会话优先（同类悬浮球）：会话头 + 长对话流 + 入口贴 composer
+   ================================================================ */
+.pc{width:520px;display:flex;flex-direction:column}
+.pc .hd{display:flex;align-items:center;gap:10px;padding:13px 15px;border-bottom:1px solid var(--hair)}
+.pc .orbm{width:26px;height:26px;border-radius:50%;flex:none;
+  background:radial-gradient(circle at 33% 27%,#fff8e0,#FFD01F 26%,#c9940a 60%,#3a2a05 100%);
+  box-shadow:0 0 0 1px rgba(255,208,31,.3),inset 0 1px 5px rgba(255,255,255,.4)}
+.pc .tt{flex:1;min-width:0}
+.pc .tt .nm{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pc .tt .sub{font-size:11px;color:var(--fg4);margin-top:1px}
+.pc .pill{font:600 11px/1 ui-monospace,Consolas,monospace;color:var(--gold);
+  border:1px solid #6b5a1c;border-radius:999px;padding:4px 9px;background:rgba(255,208,31,.06)}
+.pc .hd .grp{display:flex;align-items:center;gap:1px;margin-left:2px}
+.pc .stream{padding:14px 15px 4px;display:flex;flex-direction:column;gap:13px;min-height:298px}
+.pc .line{display:flex;flex-direction:column;max-width:100%}
+.pc .line.you{align-items:flex-end}
+.pc .line.ai{align-items:flex-start}
+.pc .who{font-size:10px;letter-spacing:.1em;color:var(--fg4);text-transform:uppercase;margin:0 3px 5px}
+.pc .bub{max-width:400px;padding:9px 12px;border-radius:12px;font-size:13px;line-height:1.66}
+.pc .line.you .bub{background:var(--you);border:1px solid var(--youbr);color:var(--fg);
+  border-bottom-right-radius:4px}
+.pc .line.ai .bub{background:#191612;border:1px solid var(--hair2);color:var(--fg2);
+  border-bottom-left-radius:4px}
+.pc .bub .cp{float:right;margin:-2px -3px 0 7px;color:var(--fg4);cursor:pointer;font-size:11px}
+.pc .bub .cp:hover{color:var(--fg2)}
+.pc .composer{margin:8px 15px 0;border:1px solid var(--hair2);border-radius:13px;background:#191612;
+  padding:11px 12px 9px;display:flex;flex-direction:column;gap:9px;
+  box-shadow:0 8px 22px rgba(0,0,0,.32)}
+.pc .composer .ph{font-size:13px;color:var(--fg4)}
+.pc .composer .brow{display:flex;align-items:center;gap:5px}
+.pc .composer .sp{flex:1}
+.pc .chip{display:inline-flex;align-items:center;gap:5px;cursor:pointer;font:inherit;font-size:11.5px;
+  color:var(--fg3);background:#17140f;border:1px solid var(--hair);border-radius:999px;padding:4px 10px}
+.pc .chip.on{color:var(--gold);border-color:#6b5a1c;background:rgba(255,208,31,.06)}
+.pc .drawer{margin:11px 15px 14px;border-top:1px solid var(--hair);padding-top:10px}
+.pc .drow{display:flex;align-items:center;gap:9px;padding:6px 2px;font-size:12.5px;color:var(--fg2)}
+.pc .tagk{font-size:10px;color:var(--fg4);border:1px solid var(--hair);border-radius:5px;padding:1px 5px;flex:none}
+/* ---------- 底部说明（折叠，不抢版面） ---------- */
+.foot{padding:0 26px 40px;max-width:760px;margin:0 auto}
+.foot details{border:1px solid var(--hair);border-radius:12px;background:#131110;padding:11px 15px}
+.foot summary{cursor:pointer;color:var(--fg3);font-size:12.5px}
+.foot summary:hover{color:var(--fg2)}
+.foot ul{margin:10px 0 2px 18px;color:var(--fg3);font-size:12px}
+.foot li{margin:5px 0}
+.foot code{color:var(--fg2);font-family:ui-monospace,Consolas,monospace;font-size:11.5px}
+</style>
+</head>
+<body data-v="a">
+<div class="desk"></div>
+
+<header class="top">
+  <div class="seg">
+    <button data-v="a">A · 纪律</button>
+    <button data-v="b">B · 克制</button>
+    <button data-v="c">C · 会话优先</button>
+  </div>
+  <div class="hint">点上面切换三版，或按 <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> —— <b>同一份内容，只有排法不同</b></div>
+</header>
+
+<main class="stage">
+
+  <!-- ================= A · 纪律（Linear 式） ================= -->
+  <section class="ver" data-v="a">
+    <div class="wrap">
+      <div class="panel pa">
+        <div class="hd">
+          <div class="t1">
+            <span class="dot"></span>
+            <span class="nm">MCP 到底创新在哪</span>
+            <span class="pct">≈25%</span>
+          </div>
+          <div class="sub">图文 · 目标 7 张 · 本地规则</div>
+        </div>
+        <div class="cmd">
+          <div class="bar"></div>
+          <div class="tx">补第 2 段：把「MCP」想简单，最容易在哪翻车？</div>
+          <div class="q" title="还有 3 段一条素材都没有，先补最前面那段最划算。">?</div>
+        </div>
+        <div class="acts">
+          <button class="icobtn"><svg class="ico" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>喂</button>
+          <button class="icobtn"><svg class="ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>搜索</button>
+          <button class="icobtn"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg>池子 · 3</button>
+          <button class="icobtn"><svg class="ico" viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l3 3M15 15l3 3M18 6l-3 3M9 15l-3 3"/></svg>提议 · 1</button>
+          <span class="sp"></span>
+          <button class="plain" title="撤回最近一次改动">↩ 撤回</button>
+          <button class="cap" title="够了，收口 —— 上限由你定">
+            <svg class="ico" style="width:13px;height:13px" viewBox="0 0 24 24"><path d="m5 13 4 4 10-10"/></svg>收口
+          </button>
+        </div>
+        <div class="conv">
+          <div class="turn you">
+            <div class="who">你</div>
+            <div class="bd">我想从「成本」这个角度切，别讲协议细节。</div>
+          </div>
+          <div class="turn ai">
+            <div class="who">AI</div>
+            <div class="bd">行，这条线可以。但先说清一件事：这里的成本是接入成本与维护成本，不是算力钱。
+              <div class="linkrow"><span class="alink" title="在浏览器打开来源">
+                <svg class="ico" style="width:12px;height:12px" viewBox="0 0 24 24"><path d="M14 5h5v5M19 5l-7 7"/><path d="M19 14v4a1.6 1.6 0 0 1-1.6 1.6H6A1.6 1.6 0 0 1 4.4 18V6.6A1.6 1.6 0 0 1 6 5h4"/></svg>
+                打开 <span class="dom">modelcontextprotocol.io</span></span></div>
+            </div>
+            <div class="actrow">
+              <span class="why">要动：第 1 段改成「接入成本到底卡在哪？」</span>
+              <button class="gbtn">照做</button>
+            </div>
+          </div>
+          <div class="turn ai">
+            <div class="who">AI</div>
+            <div class="bd typing" style="color:var(--fg4)">正在想</div>
+          </div>
+        </div>
+        <div class="composer">
+          <svg class="ico" viewBox="0 0 24 24"><path d="M4 12h16M12 4v16"/></svg>
+          <span class="ph">和它说点什么…</span>
+          <span class="k">Ctrl+↵</span>
+        </div>
+        <div class="foot">
+          <svg class="ico" style="width:13px;height:13px" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h9"/></svg>
+          未指派素材 · 2
+        </div>
+      </div>
+      <div class="orbwrap">
+        <svg class="ring" viewBox="0 0 56 56"><circle cx="28" cy="28" r="26" fill="none"
+          stroke="rgba(255,208,31,.42)" stroke-width="1.4" stroke-linecap="round"
+          stroke-dasharray="118 46"/></svg>
+        <div class="orb" style="position:absolute;left:5px;top:5px;width:36px;height:36px"></div>
+      </div>
+    </div>
+    <p class="note"><b>A · 纪律</b> —— 4 档字号、发丝线分层、动作永远靠右同一基线、对话不用气泡。最耐看、密度高；个性最弱。</p>
+  </section>
+
+  <!-- ================= B · 克制（Raycast 式） ================= -->
+  <section class="ver" data-v="b">
+    <div class="wrap">
+      <div class="panel pb">
+        <div class="pbar"></div>
+        <div class="hd">
+          <div class="orbm"></div>
+          <div class="nm">MCP 到底创新在哪</div>
+          <button class="icobtn" title="还有 3 段一条素材都没有">?</button>
+          <button class="icobtn" title="收起面板"><svg class="ico" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <div class="row">
+          <button class="sq" title="喂素材"><svg class="ico" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+          <button class="sq" title="搜素材"><svg class="ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
+          <button class="sq" title="池子 · 3"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg></button>
+          <button class="sq" title="提议 · 1"><svg class="ico" viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/></svg></button>
+          <span class="sp"></span>
+          <button class="sq" title="撤回最近一次改动"><svg class="ico" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h9a7 7 0 0 1 0 14H8"/></svg></button>
+          <button class="cap24" title="够了，收口"><svg class="ico" style="width:13px;height:13px" viewBox="0 0 24 24"><path d="m5 13 4 4 10-10"/></svg>收口</button>
+        </div>
+        <div class="conv">
+          <div class="blk you">
+            <div class="who">你</div>
+            <div class="bd">我想从「成本」这个角度切，别讲协议细节。</div>
+          </div>
+          <div class="blk ai">
+            <div class="who">AI</div>
+            <div class="bd">行，这条线可以。但先说清一件事：这里的成本是接入成本与维护成本，不是算力钱。
+              <div class="linkrow"><span class="alink">
+                <svg class="ico" style="width:12px;height:12px" viewBox="0 0 24 24"><path d="M14 5h5v5M19 5l-7 7"/><path d="M19 14v4a1.6 1.6 0 0 1-1.6 1.6H6A1.6 1.6 0 0 1 4.4 18V6.6A1.6 1.6 0 0 1 6 5h4"/></svg>
+                打开 <span class="dom">modelcontextprotocol.io</span></span></div>
+            </div>
+            <div class="actrow">
+              <span class="why">要动：第 1 段改成「接入成本到底卡在哪？」</span>
+              <button class="gbtn">照做</button>
+            </div>
+          </div>
+          <div class="blk ai">
+            <div class="who">AI</div>
+            <div class="bd typing" style="color:var(--fg4)">正在想</div>
+          </div>
+        </div>
+        <div class="composer">
+          <div class="ph">和它说点什么…</div>
+          <div class="brow">
+            <span class="sq" style="width:22px;height:22px" title="喂素材"><svg class="ico" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>
+            <span class="sq" style="width:22px;height:22px" title="搜素材"><svg class="ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>
+            <span class="sq" style="width:22px;height:22px" title="池子"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg></span>
+            <span class="sp"></span>
+            <span style="font-size:10.5px;color:var(--fg4);font-family:ui-monospace,Consolas,monospace">Ctrl+↵ 发送</span>
+          </div>
+        </div>
+        <div class="foot">
+          <svg class="ico" style="width:13px;height:13px" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h9"/></svg>
+          未指派素材 · 2
+        </div>
+      </div>
+      <div class="orbwrap">
+        <div class="orb"></div>
+      </div>
+    </div>
+    <p class="note"><b>B · 克制</b> —— 面板压到 460、进度是顶部 2px 线不占版面、动作一行 24px 无边框按钮、composer 是主角。最快、最不像网页表单；亲和人味最低。</p>
+  </section>
+
+  <!-- ================= C · 会话优先（同类悬浮球） ================= -->
+  <section class="ver" data-v="c">
+    <div class="wrap">
+      <div class="panel pc">
+        <div class="hd">
+          <div class="orbm"></div>
+          <div class="tt">
+            <div class="nm">MCP 到底创新在哪</div>
+            <div class="sub">图文 · 目标 7 张 · 本地规则</div>
+          </div>
+          <span class="pill">≈25%</span>
+          <div class="grp">
+            <button class="icobtn" title="喂素材"><svg class="ico" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+            <button class="icobtn" title="搜素材"><svg class="ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
+            <button class="icobtn" title="池子 · 3"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg></button>
+            <button class="icobtn" title="提议 · 1"><svg class="ico" viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/></svg></button>
+          </div>
+        </div>
+        <div class="stream">
+          <div class="line you">
+            <div class="who">你</div>
+            <div class="bub"><span class="cp" title="复制">⧉</span>我想从「成本」这个角度切，别讲协议细节。</div>
+          </div>
+          <div class="line ai">
+            <div class="who">AI</div>
+            <div class="bub">
+              <span class="cp" title="复制">⧉</span>
+              行，这条线可以。但先说清一件事：这里的成本是接入成本与维护成本，不是算力钱。
+              <div class="linkrow"><span class="alink">
+                <svg class="ico" style="width:12px;height:12px" viewBox="0 0 24 24"><path d="M14 5h5v5M19 5l-7 7"/><path d="M19 14v4a1.6 1.6 0 0 1-1.6 1.6H6A1.6 1.6 0 0 1 4.4 18V6.6A1.6 1.6 0 0 1 6 5h4"/></svg>
+                打开 <span class="dom">modelcontextprotocol.io</span></span></div>
+            </div>
+            <div class="actrow" style="align-self:stretch">
+              <span class="why">要动：第 1 段改成「接入成本到底卡在哪？」</span>
+              <button class="gbtn">照做</button>
+            </div>
+          </div>
+          <div class="line ai">
+            <div class="who">AI</div>
+            <div class="bub typing" style="color:var(--fg4)">正在想</div>
+          </div>
+        </div>
+        <div class="composer">
+          <div class="ph">和它说点什么…</div>
+          <div class="brow">
+            <button class="chip on"><svg class="ico" style="width:12px;height:12px" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>喂</button>
+            <button class="chip"><svg class="ico" style="width:12px;height:12px" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>搜索</button>
+            <button class="chip"><svg class="ico" style="width:12px;height:12px" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg>池子 3</button>
+            <span class="sp"></span>
+            <span style="font-size:10.5px;color:var(--fg4);font-family:ui-monospace,Consolas,monospace">Ctrl+↵</span>
+          </div>
+        </div>
+        <div class="drawer">
+          <div class="drow"><span class="tagk">速记</span>MCP 到底新在哪<span style="flex:1"></span><span style="color:var(--fg4)">指派 →</span></div>
+          <div class="drow"><span class="tagk">链接</span>MCP 为什么需要：从 N×M 到 N+M<span style="flex:1"></span><span style="color:var(--fg4)">打开源</span></div>
+        </div>
+      </div>
+      <div class="orbwrap">
+        <svg class="ring" viewBox="0 0 56 56"><circle cx="28" cy="28" r="26" fill="none"
+          stroke="rgba(255,208,31,.42)" stroke-width="1.4" stroke-linecap="round"
+          stroke-dasharray="118 46"/></svg>
+        <div class="orb" style="position:absolute;left:5px;top:5px;width:36px;height:36px"></div>
+      </div>
+    </div>
+    <p class="note"><b>C · 会话优先</b> —— 会话头（球 + 期名 + 进度 pill + 右侧图标），主体是长对话流（气泡分层、每条可复制），入口贴着 composer，抽屉从底部升起。最像"一个产品"。</p>
+  </section>
+
+</main>
+
+<footer class="foot">
+  <details>
+    <summary>三版分别在改什么（点开看）</summary>
+    <ul>
+      <li><b style="color:var(--fg2)">A · 纪律</b>：字号只 4 档（15/13/12/11）；间距刻度 4·8·12·16·24；卡片不描边，层次只靠 1px 发丝线 + 底色三档；动作永远靠右同一基线；当前项只靠「金 + 下划线」；对话不用气泡。</li>
+      <li><b style="color:var(--fg2)">B · 克制</b>：面板 460；进度做成顶部 2px 线；动作条 = 一行 24px 小按钮、无边框、hover 才有面；对话不做气泡（小标 + 1px 分割线）；composer 是主角，左右两端放图标。</li>
+      <li><b style="color:var(--fg2)">C · 会话优先</b>：会话头 + 长对话流；你暖底靠右、AI 冷底靠左，每条可复制；＋喂 / 搜索 / 池子塞进 composer 左上角；抽屉从底部升起。</li>
+      <li>三版都守着红线：暖墨 <code>#0e0c09</code> 底、米白正文、金 <code>#FFD01F</code> 只用于「主按钮 / 当前项 / 进度」、玻璃只属于球与池子。图里是静态占位，不是真数据。</li>
+    </ul>
+  </details>
+</footer>
+
+<script>
+(function(){
+  var btns = document.querySelectorAll('.seg button');
+  function set(v){
+    document.body.dataset.v = v;
+    btns.forEach(function(b){ b.classList.toggle('on', b.dataset.v === v); });
+  }
+  btns.forEach(function(b){ b.addEventListener('click', function(){ set(b.dataset.v); }); });
+  document.addEventListener('keydown', function(e){
+    if (e.key === '1') set('a');
+    if (e.key === '2') set('b');
+    if (e.key === '3') set('c');
+  });
+  set(document.body.dataset.v || 'c');
+})();
+</script>
+</body>
+</html>

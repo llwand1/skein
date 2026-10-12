@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Skein 主排版 · A 纪律（Linear 式）</title>
+<style>
+  :root{
+    --bg:#0e0c09; --card:#191612; --raise:#1d1a15; --sunken:#141210;
+    --hair:#28221b; --hair2:#3a3226;
+    --fg:#f4ede1; --fg2:#b6ab97; --fg3:#7d7361;
+    --gold:#FFD01F; --green:#9ecf4e; --blue:#86b6e6;
+    --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:#070605; color:var(--fg);
+    font:13px/1.55 "Microsoft YaHei UI","Segoe UI",sans-serif;
+    padding:32px; display:flex; gap:36px; align-items:flex-start;
+  }
+  .meta{width:330px;font-size:12px;color:var(--fg2)}
+  .meta h1{font-size:15px;color:var(--fg);margin-bottom:var(--s2)}
+  .meta h2{font-size:11px;letter-spacing:.6px;color:var(--fg3);margin:var(--s4) 0 var(--s1);font-family:Consolas,monospace}
+  .meta li{margin-left:16px;margin-bottom:3px}
+  .meta code{color:var(--gold);font-family:Consolas,monospace}
+
+  /* —— 面板：520 实尺 —— */
+  .panel{
+    width:520px;border-radius:12px;background:var(--card);
+    box-shadow:0 24px 60px rgba(0,0,0,.7);overflow:hidden;
+  }
+  .bar{display:flex;align-items:center;gap:var(--s2);height:44px;padding:0 var(--s4);
+       border-bottom:1px solid var(--hair)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--gold)}
+  .app{font-weight:600;letter-spacing:.3px}
+  .sub{color:var(--fg3);font-size:12px}
+  .right{margin-left:auto;color:var(--fg3);font-size:11px;font-family:Consolas,monospace}
+  .x{color:var(--fg3);font-size:15px;margin-left:var(--s3)}
+
+  .body{padding:var(--s5) var(--s4) var(--s4)}
+
+  /* 主题头：名称 + 行内动作。线性纪律里，动作永远靠右、同一基线 */
+  .head{display:flex;align-items:baseline;gap:var(--s2)}
+  .head h3{font-size:15px;font-weight:600;flex:1}
+  .act{font-size:12px;color:var(--fg3);cursor:pointer}
+  .act:hover{color:var(--fg)}
+
+  /* 微标签：11px 等宽 + 字距，全站唯一一种"标签" */
+  .cap{font:11px/1 Consolas,"Cascadia Mono",monospace;letter-spacing:.6px;color:var(--fg3)}
+
+  .payoff{display:flex;gap:var(--s2);align-items:baseline;margin-top:var(--s3)}
+  .payoff p{flex:1;color:var(--fg2)}
+
+  .next{display:flex;gap:var(--s2);align-items:center;margin-top:var(--s3);
+        padding-left:var(--s2);border-left:2px solid var(--gold)}
+  .next p{color:var(--gold);font-weight:600}
+  .q{width:16px;height:16px;border-radius:8px;border:1px solid var(--hair2);
+     color:var(--fg3);font-size:10px;display:grid;place-items:center;cursor:pointer}
+
+  /* 触发条：无边框文字 chip，当前项只靠"金 + 下划线" */
+  .verbs{display:flex;align-items:center;gap:var(--s3);margin-top:var(--s5);
+         padding-bottom:var(--s3);border-bottom:1px solid var(--hair)}
+  .verb{font-size:12px;color:var(--fg2);cursor:pointer;padding-bottom:2px}
+  .verb:hover{color:var(--fg)}
+  .verb.on{color:var(--gold);border-bottom:2px solid var(--gold);margin-bottom:-1px;padding-bottom:5px}
+  .verbs .gap{flex:1}
+  .pct{font:11px Consolas,monospace;color:var(--fg3)}
+  .cap-btn{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;
+           border:1px solid #6b5a1c;color:var(--gold);cursor:pointer}
+
+  /* 主区：不用气泡色块，改成"分组块 + 左侧发丝线"——Linear 的分层靠线不靠色 */
+  .thread{margin-top:var(--s5)}
+  .turn{padding-left:var(--s3);border-left:1px solid var(--hair);margin-bottom:var(--s5)}
+  .turn:last-child{margin-bottom:var(--s3)}
+  .turn.you{border-left-color:var(--hair2)}
+  .who{display:flex;align-items:center;gap:var(--s2);margin-bottom:var(--s1)}
+  .who b{font-size:11px;letter-spacing:.4px;color:var(--gold);font-weight:600}
+  .turn.ai .who b{color:var(--blue)}
+  .who span{font:11px Consolas,monospace;color:var(--fg3);opacity:.7;cursor:pointer}
+  .turn p{color:var(--fg2)}
+  .turn p+p{margin-top:var(--s2)}
+  .links{display:flex;gap:var(--s2);margin-top:var(--s2)}
+  .link{font-size:11px;color:var(--fg3);border:1px solid var(--hair);border-radius:5px;
+        padding:2px 7px;cursor:pointer}
+  .link:hover{color:var(--fg);border-color:var(--hair2)}
+  .plan{margin-top:var(--s3);padding:var(--s3);background:var(--sunken);border-radius:8px}
+  .plan p{font-size:12px;color:var(--fg3)}
+  .plan button{margin-top:var(--s2);font:600 12px inherit;color:#1a160d;background:var(--gold);
+               border:0;border-radius:7px;padding:5px 12px;cursor:pointer}
+  .sys{color:var(--fg3);font-size:12px;margin-bottom:var(--s4)}
+  .busy{color:var(--gold);font-size:12px;margin-bottom:var(--s4)}
+
+  .composer{margin-top:var(--s3);background:var(--sunken);border:1px solid var(--hair);
+            border-radius:10px;padding:var(--s3)}
+  .composer .ph{color:var(--fg3);font-size:12px;height:34px}
+  .composer .row{display:flex;justify-content:flex-end}
+  .composer button{font:600 13px inherit;color:#1a160d;background:var(--gold);border:0;
+                   border-radius:8px;padding:7px 14px;cursor:pointer}
+</style>
+</head>
+<body>
+  <div class="meta">
+    <h1>A · 纪律（Linear 式）</h1>
+    <h2>规矩</h2>
+    <ul>
+      <li>字号只 <code>4</code> 档：15 / 13 / 12 / 11</li>
+      <li>间距刻度 <code>4·8·12·16·24</code>，段间 24、卡内 12</li>
+      <li><b>卡片不描边</b>；层次只靠 1px 发丝线 + 底色三档</li>
+      <li>动作永远靠右、同一基线，字号比正文小一号</li>
+      <li>当前项只靠「金 + 下划线」，不加底色块</li>
+      <li>主色只许出现在：主按钮 / 当前项 / 进度</li>
+      <li>对话不用两个色块气泡 → <b>分组块 + 左侧发丝线</b></li>
+    </ul>
+    <h2>换取</h2>
+    <ul><li>最"耐看"，密度高、信息不吵</li><li>但个性最弱，偏"专业工具"</li></ul>
+  </div>
+
+  <div class="panel">
+    <div class="bar">
+      <i class="dot"></i><span class="app">Skein</span>
+      <span class="sub">· 一绞线</span>
+      <span class="right">本地规则</span><span class="x">×</span>
+    </div>
+    <div class="body">
+      <div class="head">
+        <h3>MCP 到底创新在哪</h3>
+        <span class="act">改期名</span><span class="act">切换</span>
+      </div>
+      <div class="payoff"><span class="cap">PAYOFF</span>
+        <p>MCP 不是「又一个函数调用」，它是集成层的最小公约数</p>
+        <span class="act">改</span>
+      </div>
+      <div class="next"><p>→ 补第 2 段：把「MCP」想简单，最容易在哪翻车？</p><span class="q">?</span></div>
+
+      <div class="verbs">
+        <span class="verb on">喂</span><span class="verb">搜索</span>
+        <span class="verb">池子 · 3</span><span class="verb">提议 · 1</span>
+        <span class="gap"></span>
+        <span class="pct">≈ 25%</span><span class="cap-btn">✓</span>
+      </div>
+
+      <div class="thread">
+        <div class="turn you">
+          <div class="who"><b>你</b><span>⧉</span></div>
+          <p>我想从「成本」这个角度切，别讲协议细节。</p>
+        </div>
+        <div class="turn ai">
+          <div class="who"><b>AI</b><span>⧉</span></div>
+          <p>行，这条线可以。但先说清一件事：这里的成本是<b>接入成本与维护成本</b>，不是算力钱。</p>
+          <div class="links"><span class="link">打开 modelcontextprotocol.io</span></div>
+          <div class="plan">
+            <p>它会动这些：第 1 段改成「接入成本到底卡在哪？」</p>
+            <button>照做</button>
+          </div>
+        </div>
+        <div class="busy">AI 正在想…</div>
+        <div class="sys">· 模型没接上（看标题栏那行状态），所以这句没人回。</div>
+      </div>
+
+      <div class="composer">
+        <div class="ph">和它说点什么…（Enter 换行，Ctrl+Enter 发送）</div>
+        <div class="row"><button>说给它</button></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

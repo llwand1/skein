@@ -1,0 +1,38 @@
+name: Release
+
+# 打一个 v* 的 tag（如 v0.20.0）就自动出包 + 建 Release。
+# 也可以在 Actions 页面手动点 Run workflow 触发。
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write      # 需要它才能创建 Release
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install "PyQt6>=6.6" "pywin32>=306" "Pillow>=10.0" pyinstaller
+
+      - name: 打包 Skein.exe
+        run: pyinstaller --noconfirm --onefile --windowed --paths app --name Skein --icon app.ico app/main.py
+
+      - name: 压成 zip
+        run: Compress-Archive -Path dist/Skein.exe -DestinationPath Skein-windows.zip
+
+      - name: 建 Release 并挂上产物
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Skein-windows.zip
+          generate_release_notes: true

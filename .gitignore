@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 本地密钥 / 用户数据（真实位置在 %LOCALAPPDATA%\Skein，这里再兜一道，防误提交）
+llm.json
+settings.json
+*.key
+.mcp-auth/
+
+# 成片产物（大二进制：视频/音频/字幕/静帧），不进代码仓
+成片/
+*.mp4
+*.mp3
+*.ass
+
+# 运行时产物
+*.db
+*.log
+.tmp-*
+
+# 编辑器 / 系统
+.idea/
+.vscode/
+Thumbs.db
+desktop.ini

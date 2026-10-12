@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>task-orb 调研验证 Demo v0.4.0（工作流先行 · 悬浮球后置 · 栈随定位定）</title>
+<style>
+  :root{
+    --bg:#141414; --panel:#1c1c1e; --panel2:#232326; --line:#2f2f33;
+    --fg:#ececec; --fg2:#a0a0a6; --fg3:#6b6b72;
+    --accent:#FFD01F; --accent-ink:#1a1a1a;
+    --ok:#4f9420; --warn:#E8A800; --danger:#FF6B6B;
+    --chip:#2c2c30; --blue:#3b82f6;
+  }
+  html[data-theme="light"]{
+    --bg:#fafafa; --panel:#ffffff; --panel2:#f3f3f5; --line:#e2e2e6;
+    --fg:#1c1c1e; --fg2:#5f6468; --fg3:#979aa0;
+    --accent:#E8A800; --accent-ink:#1a1a1a;
+    --ok:#4f9420; --warn:#C98A00; --danger:#d94a4a;
+    --chip:#ececf0; --blue:#007aff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+       font:14px/1.65 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+       transition:background .2s,color .2s}
+  .wrap{max-width:1180px;margin:0 auto;padding:22px 20px 70px}
+  code,kbd,.mono{font-family:ui-monospace,Consolas,Menlo,monospace}
+
+  header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+         padding-bottom:16px;border-bottom:1px solid var(--line)}
+  header h1{font-size:18px;margin:0;letter-spacing:.4px}
+  header .sub{color:var(--fg3);font-size:12px}
+  .spacer{flex:1}
+  button{font-family:inherit}
+  button.tgl{background:var(--chip);color:var(--fg);border:1px solid var(--line);
+    border-radius:8px;padding:6px 12px;cursor:pointer;font-size:12px}
+  button.tgl:hover{border-color:var(--accent)}
+
+  nav{display:flex;gap:6px;margin:18px 0 16px;flex-wrap:wrap}
+  nav button{background:transparent;color:var(--fg2);border:1px solid var(--line);
+    border-radius:999px;padding:7px 15px;cursor:pointer;font-size:13px}
+  nav button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+
+  .panel{display:none}
+  .panel.on{display:block}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px}
+  .card h2{margin:0 0 4px;font-size:15px}
+  .card h3{margin:18px 0 8px;font-size:13px;color:var(--fg2)}
+  .card .note{color:var(--fg3);font-size:12px;margin-bottom:14px}
+
+  .lead{background:var(--panel2);border-left:3px solid var(--accent);border-radius:0 10px 10px 0;
+        padding:14px 16px;font-size:15px;line-height:1.7}
+  .lead b{color:var(--accent)}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+  .stat{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:13px 14px}
+  .stat .n{font-size:22px;font-weight:600;font-family:ui-monospace,Consolas,monospace}
+  .stat .l{font-size:12px;color:var(--fg3);margin-top:2px}
+  .stat .src{font-size:11px;color:var(--fg3);margin-top:8px;word-break:break-all}
+
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--fg3);font-weight:500;font-size:11px;letter-spacing:.6px;text-transform:uppercase}
+  td.src{font-family:ui-monospace,Consolas,monospace;font-size:11px;color:var(--fg3);white-space:normal;word-break:break-all}
+
+  .tag{display:inline-block;border-radius:6px;padding:2px 8px;font-size:11px;white-space:nowrap;
+       border:1px solid var(--line);background:var(--chip);color:var(--fg2)}
+  .tag.ok{color:var(--ok);border-color:var(--ok)}
+  .tag.new{color:var(--danger);border-color:var(--danger)}
+  .tag.warn{color:var(--warn);border-color:var(--warn)}
+  .tag.blue{color:var(--blue);border-color:var(--blue)}
+  .tag.solid{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+
+  ul.tight{margin:6px 0 0;padding-left:20px}
+  ul.tight li{margin-bottom:6px}
+  .k{color:var(--fg2);font-size:12px}
+
+  /* ---------- 模拟桌面 ---------- */
+  .simbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+  .simbar .label{font-size:12px;color:var(--fg3)}
+  .stage{position:relative;height:600px;border:1px solid var(--line);border-radius:12px;overflow:hidden;
+         background:var(--panel2)}
+  .fakewin{position:absolute;inset:14px 14px 14px 14px;background:var(--panel);
+           border:1px solid var(--line);border-radius:10px;display:flex;flex-direction:column;overflow:hidden}
+  .chrome{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);
+          background:var(--panel2)}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--line)}
+  .url{flex:1;background:var(--chip);border-radius:6px;padding:4px 10px;font-size:11px;color:var(--fg2);
+       font-family:ui-monospace,Consolas,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .article{padding:16px 20px;overflow:auto;font-size:13.5px;line-height:1.85;color:var(--fg)}
+  .article h4{margin:14px 0 8px;font-size:16px}
+  .article p{margin:0 0 12px}
+  .article p.hot{transition:background .25s}
+  .article p.hot:hover{background:rgba(255,208,31,.07)}
+  .article::selection,.article *::selection{background:rgba(255,208,31,.35);color:var(--fg)}
+  .hintline{position:absolute;left:26px;top:74px;font-size:12px;color:var(--accent);
+            background:var(--panel);border:1px dashed var(--accent);border-radius:8px;padding:6px 10px;
+            display:none;z-index:6}
+  .hintline.on{display:block}
+
+  /* ---------- 悬浮球 ---------- */
+  .orb{position:absolute;right:24px;bottom:24px;width:64px;height:64px;border-radius:50%;
+       background:var(--panel2);border:1px solid var(--line);cursor:pointer;z-index:20;
+       display:grid;place-items:center;box-shadow:0 6px 22px rgba(0,0,0,.35);transition:transform .18s,background .3s}
+  .orb:hover{transform:scale(1.05)}
+  .orb.ready{background:var(--accent);border-color:var(--accent)}
+  .orb.ready .ring{stroke:var(--accent-ink)}
+  .orb .ring{stroke:var(--accent);transition:stroke .3s}
+  .orb .pct{position:absolute;font-size:11px;font-weight:700;color:var(--fg);font-family:ui-monospace,Consolas,monospace}
+  .orb.ready .pct{color:var(--accent-ink)}
+  .orb.pulse{animation:pulse 1.1s ease-in-out 3}
+  @keyframes pulse{0%,100%{box-shadow:0 6px 22px rgba(0,0,0,.35)}50%{box-shadow:0 0 0 12px rgba(255,208,31,.22)}}
+  .badge{position:absolute;top:-2px;right:-2px;min-width:20px;height:20px;border-radius:999px;
+         background:var(--danger);color:#fff;font-size:11px;display:none;place-items:center;padding:0 5px;
+         font-family:ui-monospace,Consolas,monospace}
+  .badge.on{display:grid}
+
+  .orbpanel{position:absolute;right:100px;bottom:24px;width:330px;max-height:520px;overflow:auto;
+            background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 15px;
+            z-index:19;box-shadow:0 10px 34px rgba(0,0,0,.4);display:none}
+  .orbpanel.on{display:block}
+  .orbpanel .ptitle{display:flex;align-items:center;gap:8px;margin-bottom:2px}
+  .orbpanel .ptitle b{font-size:14px}
+  .orbpanel .psub{font-size:11px;color:var(--fg3);margin-bottom:12px;font-family:ui-monospace,Consolas,monospace}
+  .item{display:flex;gap:9px;align-items:flex-start;padding:8px 8px;border-radius:8px;cursor:pointer;
+        border:1px solid transparent}
+  .item:hover{background:var(--panel2);border-color:var(--line)}
+  .item .box{width:16px;height:16px;border:1.5px solid var(--fg3);border-radius:4px;flex:0 0 auto;margin-top:3px;
+             display:grid;place-items:center}
+  .item.done .box{background:var(--ok);border-color:var(--ok)}
+  .item.done .box svg{display:block}
+  .item .box svg{display:none}
+  .item .tx b{font-weight:500;font-size:13px}
+  .item.done .tx b{text-decoration:line-through;color:var(--fg3)}
+  .item .tx i{display:block;font-style:normal;font-size:11px;color:var(--fg3)}
+  .evidence{margin:4px 0 0 24px;font-size:11px;color:var(--fg2);background:var(--chip);border-radius:6px;
+            padding:5px 8px;border-left:2px solid var(--ok);word-break:break-all}
+  .feedbtn{width:100%;margin-top:12px;background:var(--accent);color:var(--accent-ink);border:none;
+           border-radius:8px;padding:9px;font-size:13px;font-weight:600;cursor:pointer}
+  .feedbtn:disabled{background:var(--chip);color:var(--fg3);cursor:not-allowed}
+  .ghostbtn{width:100%;margin-top:8px;background:transparent;color:var(--fg2);border:1px solid var(--line);
+            border-radius:8px;padding:7px;font-size:12px;cursor:pointer}
+
+  .feedmenu{position:absolute;z-index:30;background:var(--panel);border:1px solid var(--accent);
+            border-radius:10px;padding:8px;width:250px;box-shadow:0 10px 30px rgba(0,0,0,.45);display:none}
+  .feedmenu.on{display:block}
+  .feedmenu .fh{font-size:11px;color:var(--fg3);padding:2px 6px 6px}
+  .feedmenu .sel{font-size:11px;color:var(--fg2);background:var(--chip);border-radius:6px;padding:5px 7px;margin-bottom:6px;
+                 max-height:52px;overflow:hidden}
+  .feedmenu button.opt{width:100%;text-align:left;background:transparent;border:none;color:var(--fg);
+            border-radius:6px;padding:7px 8px;font-size:12.5px;cursor:pointer}
+  .feedmenu button.opt:hover{background:var(--panel2)}
+  .feedmenu button.opt.done{color:var(--fg3)}
+  .feedmenu .mfoot{border-top:1px solid var(--line);margin-top:6px;padding-top:6px;font-size:10.5px;color:var(--fg3)}
+
+  .draftbox{margin-top:12px;border-top:1px dashed var(--line);padding-top:12px}
+  .draftbox .dt{font-size:11px;color:var(--fg3);margin-bottom:6px}
+  .draftbox .d{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 11px;
+               font-size:12.5px;line-height:1.75;white-space:pre-wrap}
+  .pubrow{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap}
+  .pubrow button{background:var(--chip);border:1px solid var(--line);color:var(--fg);border-radius:7px;
+                 padding:6px 10px;font-size:12px;cursor:pointer}
+  .pubrow button:hover{border-color:var(--accent)}
+
+  .steps{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+  .steps button{background:var(--chip);border:1px solid var(--line);color:var(--fg2);border-radius:999px;
+                padding:5px 12px;font-size:12px;cursor:pointer}
+  .steps button.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .stepdesc{margin-top:10px;font-size:12.5px;color:var(--fg2);background:var(--panel2);
+            border-radius:8px;padding:10px 12px;border-left:2px solid var(--blue)}
+
+  .cmdbox{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;
+          font-family:ui-monospace,Consolas,monospace;font-size:11.5px;color:var(--fg2);
+          white-space:pre-wrap;word-break:break-all;line-height:1.7}
+  footer{margin-top:26px;padding-top:14px;border-top:1px solid var(--line);color:var(--fg3);font-size:12px}
+  .flexg{display:flex;gap:10px;align-items:flex-start}
+  .ico{flex:0 0 auto;margin-top:2px}
+  @media (max-width:820px){ .orbpanel{right:14px;bottom:96px;width:calc(100% - 28px)} .stage{height:660px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <svg class="ico" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#FFD01F" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3.5M12 17.5V21M3 12h3.5M17.5 12H21"/>
+  </svg>
+  <div>
+    <h1>task-orb 调研验证 Demo</h1>
+    <div class="sub"><b>v0.4.0</b> ｜ 2026-10-08 ｜ 修正：工作流先行、悬浮球后置（P2）；纠正对词镜主体的误读；<b>栈不定，先钉产品定位</b>（含求职维度与 Java 候选条件表）｜ 对象：<code>Desktop\task-orb\docs\requirements.md</code>（v0.3.0 WIP，零代码）｜ 单文件零依赖，断网可开</div>
+  </div>
+  <div class="spacer"></div>
+  <button class="tgl" id="themeBtn">切换明暗</button>
+</header>
+
+<nav id="nav">
+  <button class="on" data-p="p0">0 · 结论（已修正）</button>
+  <button data-p="p1">1 · 我的误读与纠正</button>
+  <button data-p="p2">2 · 悬浮球形态预演（P2）</button>
+  <button data-p="p3">3 · 技术依据</button>
+  <button data-p="p4">4 · 待拍板</button>
+  <button data-p="p5">5 · 架构与选型</button>
+</nav>
+
+<!-- ============ 0 结论 ============ -->
+<section class="panel on" id="p0">
+  <div class="card">
+    <h2>结论前置（v0.3.0 对齐版）</h2>
+    <div class="note">上一版结论已被老板推翻，本版为修正后口径。修正点写在 §1，不藏起来。</div>
+    <div class="lead">
+      <b>顺序错了：先跑通工作流，悬浮球后置。</b>P0 不该是做球 —— 球只是「把未完成钉在你眼前」的<b>载体／放大系数</b>，它验证不了<b>闭环本身值不值得做</b>。P0 应该先用最朴素的载体跑完「定主题 → 清单 → 浏览喂素材 → 打勾 → 齐了 → 出草稿 → 跳发布页」，<b>确认这一圈真的能攒出一篇东西</b>，再谈球。
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>为什么顺序必须反过来</h2>
+    <div class="note">这不是审美问题，是「用球验什么」的问题。</div>
+    <table>
+      <thead><tr><th style="width:34%">要验的事</th><th style="width:20%">球验得了吗</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td><b>闭环价值</b>：给了清单，你浏览时会不会真的顺手喂、能不能攒齐、攒齐后能不能真发出去</td><td><span class="tag new">验不了</span></td><td>球不影响「你喂不喂」，只影响「你会不会想起来」。用一个不影响结果的变量去验收，结论必然失真。</td></tr>
+        <tr><td><b>清单质量</b>：生成的清单是不是这一期真正缺的东西</td><td><span class="tag new">验不了</span></td><td>清单错了，球再醒目也只是让你更快攒出一堆没用的素材。</td></tr>
+        <tr><td><b>载体价值</b>：没有球会不会忘了这件事、会不会半途而废</td><td><span class="tag ok">只有这个能验</span></td><td>这才是球的变量 —— 它是<b>后置</b>的，因为要等闭环被证明值得做，才轮到优化载体。</td></tr>
+      </tbody>
+    </table>
+    <div class="k" style="margin-top:10px">一句话：<b>先证明这件事有用，再让它变轻。</b>反过来做的话，最可能的结局是「球做得很好看，清单一次也没攒齐过」。</div>
+  </div>
+
+  <div class="grid">
+    <div class="stat">
+      <div class="n">P0</div>
+      <div class="l">工作流闭环本身（不含悬浮球）</div>
+      <div class="src">载体可以极朴素：托盘 + 划选浮层即可</div>
+    </div>
+    <div class="stat">
+      <div class="n">P1</div>
+      <div class="l">把「喂素材」融进浏览动作</div>
+      <div class="src">对应词镜真正的主体，不是它的浮层</div>
+    </div>
+    <div class="stat">
+      <div class="n">P2</div>
+      <div class="l">悬浮球（提醒载体，后置）</div>
+      <div class="src">难点仍是不抢焦点，但不阻塞 P0</div>
+    </div>
+    <div class="stat">
+      <div class="n">24 篇</div>
+      <div class="l">可直接当素材清单模板来源的既有选题排期</div>
+      <div class="src">奶蛙视频账号/视频账号运维手册-v0.1.md §7.1</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>P0 的验收判据（先证明有用）</h2>
+    <ul class="tight">
+      <li><b>真主题、真素材、真发布。</b>用一期你真打算发的主题跑完，不是测试主题 —— 用假主题跑，整圈的价值无从判断。</li>
+      <li><b>出口物判据：攒齐的素材能不能直接进排版。</b>判据不是「清单打勾打完了」，而是「把这 4 项素材丢给排版，能不能不再回头找资料」。</li>
+      <li><b>记录喂素材的真实摩擦。</b>每一次「看到了但没喂」都要记原因 —— 是没想起来（那是球的问题，P2 治），还是不知道该喂给哪一项（那是清单的问题，P0 就得修）。<b>这两类原因指向完全不同的阶段，混在一起记就等于没记。</b></li>
+    </ul>
+    <div class="k" style="margin-top:8px">对照 requirements 2.2 原验收「连续两天愿意把它开着」—— 那是<b>球的验收</b>，属于 P2；放到 P0 会把「球好不好用」误当成「工作流成不成立」。</div>
+  </div>
+
+  <div class="card">
+    <h2>P0 之外的既成事实（仍成立，但都不阻塞 P0）</h2>
+    <div class="note">这些是查证所得，与顺序无关，先记着，等 P0 跑通时再用。</div>
+    <ul class="tight">
+      <li><b>跳转发布页不用写。</b><code>native_tools.py:19-20</code> 已有 <code>computer.open_url</code> / <code>computer.open_app</code> / <code>shortcut.run</code>。</li>
+      <li><b>内容侧不用从零想。</b>奶蛙 E001~E024 排期 + 单篇 8 步 SOP 可反向生成清单模板（回答 Q2）。</li>
+      <li><b>常驻球零现成代码。</b>grep 无 <code>topmost/overrideredirect/wm_attributes</code>，当前 UI 只有托盘 + <code>tk.Toplevel</code>（desktop_ui.py:11）—— 这反过来佐证它该后置：它是要新做的，别让它堵在 P0 前面。</li>
+      <li><b>P2 球若在显示/点击时抢焦点会打断阅读</b>（直接违反 P-007 的「轻」）。既有实机结论：UIA TextPattern 取文本不依赖焦点；且方法学警示 —— Windows 上「显示即抢焦点」根本测不出来，所以球的探针必须能测出失败模式。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>复核命令（git-bash，可复跑）</h2>
+    <div class="cmdbox"># 1) 项目唯一需求真相源（§1 是老板原话，不可改写）
+sed -n '1,20p' "/c/Users/llwan/Desktop/task-orb/docs/requirements.md"
+
+# 2) 词镜的主体到底是不是浮层 —— 看系统级输入层怎么接的（关键判据）
+sed -n '/实际能力/,/密码模式/p' "/c/Users/llwan/Desktop/词镜交付/当前版本/app/system/README.md"
+
+# 3) 词镜的产品命题（P-011「问题发生在哪里，就在哪里问」）
+sed -n '1,12p' "/c/Users/llwan/Desktop/词镜交付/当前版本/docs/product.md"
+
+# 4) 确认跳转执行器在工具白名单里（第 19-20 行）
+sed -n '17,20p' "/c/Users/llwan/Desktop/词镜交付/当前版本/app/desktop/native_tools.py"
+
+# 5) 确认「常驻置顶球」现成代码量（预期为空）
+cd "/c/Users/llwan/Desktop/词镜交付/当前版本/app/desktop" &amp;&amp; grep -rn "topmost\|overrideredirect\|wm_attributes" *.py</div>
+    <div class="k" style="margin-top:8px">第 5 条实测输出为空（唯一命中是 <code>desktop_ui.py:11</code> 的 <code>tk.Toplevel</code>）；第 2 条会看到全局钩子 + TSF 接管，那是词镜的主体。</div>
+  </div>
+</section>
+
+<!-- ============ 1 资产盘点 ============ -->
+<section class="panel" id="p1">
+  <div class="card">
+    <h2>我读错了什么（原样挂出，不改写）</h2>
+    <div class="note">老板指出两点：① 别总拿词镜当参照；② 词镜的主体不是悬浮球，是<b>直接的系统级融合</b>。两点都成立，下面是查证后的逐条认领。</div>
+    <table>
+      <thead><tr><th style="width:24%">我的误读</th><th style="width:38%">实际是什么（证据）</th><th>这个误读造成了什么后果</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>把浮卡当成了词镜的主体</b></td>
+          <td>主体是<b>系统级融合</b>：原生 DLL 通过全局 <code>WH_GETMESSAGE</code>/<code>WH_CALLWNDPROC</code> 接入目标 UI 线程，检索该线程 TSF manager 并订阅 <code>ITfTextEditSink::OnEndEdit</code>；<b>不创建宿主输入服务、不更换输入法、无需添加应用或逐软件授权</b>。<div class="k" style="margin-top:6px">来源：<code>词镜交付/当前版本/app/system/README.md</code>「实际能力」</div></td>
+          <td>浮卡/玻璃卡只是它的<b>一个出口</b>。我把出口当成主体，于是把 task-orb 也想象成「一个浮层产品」—— 参照系从根上就歪了。</td>
+        </tr>
+        <tr>
+          <td><b>把「问题发生在哪里就在哪里问」读成了形态描述</b></td>
+          <td>它是<b>产品命题</b>：停在文章里直接打字就问，原位承接，回答浮在旁边，<b>不要求切换页面或建任务</b>。<div class="k" style="margin-top:6px">来源：<code>docs/product.md</code> P-011 标题原文</div></td>
+          <td>我把它降格成「划选弹卡」这个交互，丢掉了「不打断自然行为」这条真正的原则。</td>
+        </tr>
+        <tr>
+          <td><b>把「有验证证据」当成「形态可参照」</b></td>
+          <td>SPEC §1.1 核心命题写的是：<b>「让 AI 去读取你、配合你，但你不会有明显感知，让它真正融入你的自然行为中」</b>；并明确「入口不再是产品的一等公民」。<div class="k" style="margin-top:6px">来源：<code>Omnilex/SPEC.md</code> §1.1</div></td>
+          <td>词镜是本机<b>唯一</b>有完整验证记录的桌面资产（198/63 断言），我就把它当成了默认参照系 —— 这是锚定，不是推理。它的验证强度说明它<b>可信</b>，不说明它<b>该被模仿</b>。</td>
+        </tr>
+        <tr>
+          <td><b>由此推出：P0 = 做球</b></td>
+          <td>顺序应是：<b>先跑通工作流，球后置</b>。</td>
+          <td>错误的参照系推导出错误的优先级。而「入口不是一等公民」这条，恰恰是<b>反对</b>先把球做起来的。</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>纠正之后，方向反而更清楚了</h2>
+    <div class="note">这一条是这次纠正里最有价值的推论。</div>
+    <div class="lead" style="border-left-color:var(--blue)">
+      如果词镜的主体真是「系统级融合」，那么 task-orb 的<b>终极形态也不是悬浮球</b> —— 球只是「把未完成钉在你眼前」的提醒器，甚至是<b>过渡形态</b>。真正的方向是：<b>让喂素材这个动作融进你本来就在做的浏览行为里，不要求你先打开任何东西。</b>
+    </div>
+    <ul class="tight" style="margin-top:12px">
+      <li>这恰好解释了为什么球该后置：它是<b>提醒载体</b>，作用在「你会不会想起来」；而 P0 要证的是「这一圈能不能攒出一篇」—— 后者成立与否，跟球一点关系都没有。</li>
+      <li>也解释了 P-007 的「轻」到底在说什么：<b>不是「窗口小」</b>，是「不要求用户发起一个使用动作」。用这个口径看，一个必须点击才能用的球，本身就还不够轻。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>给自己立的判据（防止下次再犯）</h2>
+    <div class="note">写下来是因为这类错误会重复发生，靠记忆拦不住。</div>
+    <ul class="tight">
+      <li><b>判据一：说「可复用」之前，先回答「我复用的是它的主体还是它的一块皮」。</b>浮层、卡片、面板都是皮；接入方式、原则、数据边界才是主体。</li>
+      <li><b>判据二：「可复用」不能决定「优先级」。</b>优先级只能由需求本身决定 —— 哪怕某个能力 100% 能复用，只要它不属于当前要验的那件事，就不该排在前面。</li>
+      <li><b>判据三：参照一个既有产品前，先读它的产品命题（宪法级）章节，再读实现。</b>这次我先读了实现与验证数，跳过了命题，所以把手段当成了目的。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>修正后的对照表</h2>
+    <div class="note">左边是需求，中间两列分别是「我上一版怎么定性」和「修正后怎么定性」。带删除线的是被推翻的。</div>
+    <table>
+      <thead><tr><th style="width:21%">task-orb 需要的能力</th><th style="width:29%">本机现状（实读）</th><th style="width:24%">位置</th><th style="width:26%">结论（v0.3 修正后）</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>网页正文 / 可见段落 / 选区读取</b><div class="k">P1「顺手喂素材」的入口</div></td>
+          <td>词镜 v0.5.0 已交付：非编辑区直接打字即可问，网页问题自动带上当前页可读正文、可见段落和选区</td>
+          <td class="src">README.md（当前版本）；<br>app/desktop/reading_surface.py</td>
+          <td><span class="tag warn">原则可参照，形态不可照抄</span><div class="k" style="margin-top:6px">该学的是「问题发生在哪里就在哪里喂、不切上下文」，不是那张玻璃卡</div></td>
+        </tr>
+        <tr>
+          <td><b>划选 → 就地浮卡</b><div class="k">只是词镜的一个出口，不是它的主体</div></td>
+          <td>已实现：划选文字使用原位玻璃卡、翻译、解释、圈选即输入</td>
+          <td class="src">README.md；<br>app/desktop/cijing_desktop.py；<br>desktop_ui.py</td>
+          <td><span class="tag warn">别照抄形态</span><div class="k" style="margin-top:6px">出口确实是「喂给清单项」，但形态该由工作流决定，不由词镜决定</div></td>
+        </tr>
+        <tr>
+          <td><b>图片 / 自绘界面兜底</b><div class="k">喂截图类素材</div></td>
+          <td>已实现：浏览器不给正文时走 Windows 识字（OCR），并<i>明确标注仅当前可见区域</i></td>
+          <td class="src">app/desktop/reading_ocr.py；<br>验证证据/reading-ocr-native.json</td>
+          <td><span class="tag blue">P1 才用，P0 不碰</span><div class="k" style="margin-top:6px">覆盖面限制仍在；P0 先只走选区文本</div></td>
+        </tr>
+        <tr>
+          <td><b>一键跳各平台发布页</b><div class="k">P2</div></td>
+          <td>工具白名单已含 computer.open_url / computer.open_app / shortcut.run；回执只证明系统接受请求，不等同网页已加载</td>
+          <td class="src">app/desktop/native_tools.py:19-20</td>
+          <td><span class="tag ok">现成</span><div class="k" style="margin-top:6px">工具层、与形态无关 —— 这批里唯一不受误读影响的一条</div></td>
+        </tr>
+        <tr>
+          <td><b>「任务清单」数据对象</b><div class="k">每一期的素材列表</div></td>
+          <td>存在 task.create / task.list，但语义是「行为采集任务」（旧习惯引擎），<b>不是</b>「专题 + 素材项」</td>
+          <td class="src">app/desktop/native_tools.py:17、215-216；<br>legacy/omnilex_select_read.py:4428-4434</td>
+          <td><span class="tag warn">别直接套</span><div class="k" style="margin-top:6px">同名不同义，建议新建 Topic 表</div></td>
+        </tr>
+        <tr>
+          <td><b>词镜真正该被参照的东西</b><div class="k">这一行是这次纠正的核心</div></td>
+          <td><b>系统级融合</b>：全局钩子接入目标 UI 线程 + TSF <code>OnEndEdit</code> 订阅，<b>不创建宿主输入服务、不更换输入法、无需逐软件授权</b>；产品命题是「让你没有明显感知」</td>
+          <td class="src">app/system/README.md「实际能力」；<br>docs/product.md P-011；<br>Omnilex/SPEC.md §1.1</td>
+          <td><span class="tag blue">映射到 task-orb</span><div class="k" style="margin-top:6px">喂素材不该要求「先打开 orb / 先建任务」—— 这条原则决定 P1 怎么做，也解释了球为什么只是过渡形态</div></td>
+        </tr>
+        <tr>
+          <td><b>常驻置顶悬浮球窗口</b><div class="k">后置到 P2，不在 P0</div></td>
+          <td><b>没有。</b>当前 UI 是「双击托盘 + Toplevel 面板」，全量 grep 无 topmost / overrideredirect / wm_attributes</td>
+          <td class="src">app/desktop/desktop_ui.py:11（仅 tk.Toplevel）</td>
+          <td><span class="tag new">必须新做</span><div class="k" style="margin-top:6px"><b>但它是 P2</b>：零现成代码 ≠ 该排在最前面</div></td>
+        </tr>
+        <tr>
+          <td><b>本地持久化</b><div class="k">素材存哪</div></td>
+          <td>稳定在 %LOCALAPPDATA%\Cijing-Desktop，更新不替换用户库</td>
+          <td class="src">README.md（当前版本）</td>
+          <td><span class="tag warn">待定：</span><div class="k" style="margin-top:6px">共用库 / 独立开库，需老板拍板</div></td>
+        </tr>
+        <tr>
+          <td><b>素材清单从哪来</b><div class="k">回答 Q2</div></td>
+          <td>奶蛙账号已有 E001~E024 冷启动排期 + 单篇 8 步 SOP（含每步出口物与判据）+ 三类常备选题池</td>
+          <td class="src">奶蛙视频账号/视频账号运维手册-v0.1.md §6 / §7</td>
+          <td><span class="tag blue">现成语料</span><div class="k" style="margin-top:6px">可直接生成清单模板 —— <b>P0 的核心输入</b></div></td>
+        </tr>
+        <tr>
+          <td><b>AI 草稿的人设</b><div class="k">奶蛙语气</div></td>
+          <td>角色资产卡 v1.1 已锁死：色板 #FFD01F / #FFF6E0 / #6FBF2A / #6B5D4F，5 个表情，固定口癖「今天奶蛙给你讲清楚 XXX。」「就这。」</td>
+          <td class="src">奶蛙视频账号/assets/character-sheet.md；<br>运维手册 §5</td>
+          <td><span class="tag ok">可直接引用</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>诚实边界：这次调查没验到的部分</h2>
+    <ul class="tight">
+      <li>未打开任何 <code>.py</code> 逐行审计，以上均为 grep / 文档实读 + manifest 核对，<b>不等于源码级 review</b>。</li>
+      <li>词镜的网页读取验证舱是自述的 <code>"browser":"Owned Edge guest/local HTML"</code>、<code>"model":"injected offline"</code> —— 它证明<b>通道成立</b>，不证明任意第三方网页、任意 Electron 应用都同表现。</li>
+      <li>没有跑任何一条探针；本次未产生新的真机数据，全部引用既有记录。</li>
+      <li>「个人顺手」之外的场景（P-003 明确后置的大体量）本次一律未评估。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 2 悬浮球实机模拟 ============ -->
+<section class="panel" id="p2">
+  <div class="card">
+    <h2>悬浮球交互模拟</h2>
+    <div class="note">
+      <span class="tag new">HTML 演示</span> <span class="tag warn">P2 形态预演 · 不阻塞 P0</span> 下面整个画面都是本页内的模拟，<b>不是真机截图、不是已实现的功能</b>；但它跑的是真实交互逻辑：<b>你可以在文章里真的划选一段字</b>，松开鼠标后会弹出「喂给哪一项」，点了就真的写进清单、真的推进进度环。<br>
+      <b>它现在的作用是「预演手感」，不是规定 P0 该做什么</b> —— 按修正后的顺序，球排在 P2；这一页只回答「如果将来做球，它应该长什么样、哪一步会打断阅读」。
+    </div>
+
+    <div class="steps" id="steps">
+      <button class="on" data-s="0">1 · 定主题</button>
+      <button data-s="1">2 · 生成素材清单</button>
+      <button data-s="2">3 · 浏览顺手喂素材</button>
+      <button data-s="3">4 · 清单打勾</button>
+      <button data-s="4">5 · 齐了 → 提醒</button>
+      <button data-s="5">6 · 跳发布页 + 建议</button>
+    </div>
+    <div class="stepdesc" id="stepdesc"></div>
+    <div class="simbar" style="margin-top:12px">
+      <button class="tgl" id="prevBtn">上一个</button>
+      <button class="tgl" id="nextBtn">下一个</button>
+      <button class="tgl" id="resetBtn">重置</button>
+      <span class="label">当前step标注 = 工作流演示；你也可以不按流程直接划选、直接点清单项。</span>
+    </div>
+  </div>
+
+  <div class="stage" id="stage">
+    <div class="fakewin">
+      <div class="chrome">
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        <span class="url">https://example-article.local/mcp-what-is-actually-new — 浏览器（模拟）</span>
+      </div>
+      <div class="article" id="article">
+        <h4>关于 MCP，真正新的那一点在哪</h4>
+        <p>很多人第一次看 MCP，会把它理解成「又一种函数调用」。这个理解不算错，但它解释不了一个事实：为什么大家已经能用 function calling 把模型接到自己的数据库上了，还非要再套一层协议。</p>
+        <p>要回答这个问题，得先承认 function calling 解决的只是「模型如何表达它想调用什么」。它是一个模型侧的约定，至于那个函数在哪里、怎么被找到、谁有权限调、调用过程怎么被观测 —— 这些它一个都没管。于是每个客户端都要为每个数据源重写一遍集成。</p>
+        <p>真正的差别在于：协议把「发现能力」和「使用能力」这两件事标准化了。工具清单可以被询问、可以被列举、带着输入模式返回；宿主不必在编译期就知道世界上有哪些工具。</p>
+        <p>反过来看边界也清楚：它不负责模型好不好、不负责推理质量、也不替你做权限判断。把它当万能钥匙会失望，把它当「集成层的最小公约数」则刚好。</p>
+        <p>所以对使用者的实际结论是：当你只有一个数据源时，它几乎没有价值；当你要把同一份能力接进多个不同的宿主时，它的收益才开始显现。</p>
+        <p class="k">（以上为演示用样张文本，非引用真实来源，避免把 demo 里的句子当成可发布的事实。）</p>
+      </div>
+    </div>
+
+    <div class="hintline" id="hintline">试着在这里划选一句话 —— 松开鼠标后会弹出「喂给哪一项」</div>
+
+    <!-- 悬浮球 -->
+    <div class="orb" id="orb" title="点击展开/收起任务清单">
+      <svg class="ring" width="64" height="64" viewBox="0 0 64 64">
+        <circle cx="32" cy="32" r="27" fill="none" stroke-width="3" stroke-opacity=".22" class="ring"/>
+        <circle cx="32" cy="32" r="27" fill="none" stroke-width="3" stroke-linecap="round"
+                id="ringArc" stroke-dasharray="169.6" stroke-dashoffset="169.6"
+                transform="rotate(-90 32 32)" style="transition:stroke-dashoffset .5s"/>
+      </svg>
+      <span class="pct" id="orbPct">0/4</span>
+      <span class="badge" id="orbBadge">!</span>
+    </div>
+
+    <!-- 球展开的清单面板 -->
+    <div class="orbpanel" id="orbPanel">
+      <div class="ptitle">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h10"/><circle cx="19" cy="17" r="2.2"/></svg>
+        <b id="taskTitle">E005 · MCP 到底创新在哪</b>
+      </div>
+      <div class="psub" id="taskSub">本期任务 · 素材清单 4 项 · 目标：抖音图文 7 张</div>
+      <div id="itemList"></div>
+      <button class="feedbtn" id="feedBtn" disabled>素材齐了，去准备发布</button>
+      <div class="draftbox" id="draftBox" style="display:none">
+        <div class="dt">AI 草稿建议（奶蛙语气 · 由已有人设规范生成，<b>不是真实模型输出</b>）</div>
+        <div class="d" id="draftText"></div>
+        <div class="dt" style="margin-top:10px">一键跳发布页 <span class="tag ok">= computer.open_url 现成能力</span></div>
+        <div class="pubrow">
+          <button id="pubDy">抖音创作发布</button>
+          <button id="pubBili">B站投稿</button>
+          <button id="pubXhs">小红书发布</button>
+        </div>
+      </div>
+      <button class="ghostbtn" id="clearBtn">清空全部素材（重来）</button>
+    </div>
+
+    <!-- 划选后菜单 -->
+    <div class="feedmenu" id="feedMenu">
+      <div class="fh">把这段喂给清单里的哪一项？</div>
+      <div class="sel" id="selPreview"></div>
+      <div id="optList"></div>
+      <div class="mfoot">真实实现里，这一步由划选浮卡改造而来（现有能力：划选 → 原位玻璃卡）</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>这个模拟说明了什么</h2>
+    <ul class="tight">
+      <li><b>认知成本确实低。</b>整个喂素材动作 = 划选 + 点一项，两次操作，不需要离开正在读的页面 —— 这是 P-007「轻」能不能成立的关键，靠文字描述是验证不了的。</li>
+      <li><b>提醒的强度来自「未完成」，不来自推送。</b>球一直在角落显示 <code>2/4</code> 这种未完成态，比任何通知条都更像「反向监督」，直接对应 P-005 的后半句。</li>
+      <li><b>最后一步必须交回真人。</b>demo 里跳发布页只填建议、不代发 —— 这是 P-001 原话「最后还是由真人执行」的形状，也是 §3 红线第一条。</li>
+      <li><span class="tag new">边界</span> <b>这一页验不了 P0。</b>你能在这里顺畅地喂完 4 项，只说明交互不别扭；说明不了「你明天真的会用它攒出一篇文章」。后者必须用真主题、真发布去跑，不能用任何模拟替代。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 3 技术依据 ============ -->
+<section class="panel" id="p3">
+  <div class="card">
+    <h2>三条本机已有的实机结论（决定 P1/P2 怎么做）</h2>
+    <div class="note">来源是你自己的开发登记与个人开发文档，不是本次新测。按修正后的顺序，它们主要约束 P1（融进浏览）与 P2（球），<b>P0 用不到这些</b>。</div>
+    <table>
+      <thead><tr><th style="width:26%">结论</th><th>对 task-orb 的含义</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>UIA TextPattern 取文本不依赖焦点</b><div class="k">推翻了「只有截图 OCR 才行」的旧判断</div></td>
+          <td>球可以<b>不抢焦点</b>地拿到浏览器里的选区 —— 「不打断阅读」和「拿到素材」可以同时成立。正确路线是 <span class="tag blue">UIA 主 + 区域 OCR 兜底</span>，而不是二选一。</td>
+        </tr>
+        <tr>
+          <td><b>Chromium 页面默认启动 ≤1s 即可直读</b><div class="k">不需要给浏览器加任何启动参数</div></td>
+          <td>不用让用户为了装 orb 去改浏览器配置 —— 否则「轻」直接破功（对应 P-007）。</td>
+        </tr>
+        <tr>
+          <td><b>方法学警戒：Windows 上「显示即抢焦点」根本测不出来</b><div class="k">真正的分歧点在鼠标点击</div></td>
+          <td>P0 的探针<b>必须能测出失败模式</b>，否则「通过」没有意义。建议直接设一条失败判据：球显示后，浏览器里的输入光标位置与选区是否仍然可用。</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="k" style="margin-top:10px">上述三条的既有记录位置：<code>llwan的个人开发文档/META.md</code>（Omnilex 行，含实测描述与配套原型/截图），可视化产物 <code>Omnilex/docs/fork/直读文本-能力与覆盖实测.html</code>、<code>划线读取-可行性探索与体验.html</code> —— 两个文件均已实读确认在盘。</div>
+  </div>
+
+  <div class="card">
+    <h2>修正后的三阶段路线（球在 P2）</h2>
+    <div class="note">P0 只求把工作流跑通，载体越朴素越好 —— 朴素到能暴露「这一圈到底值不值得做」为止。</div>
+    <table>
+      <thead><tr><th style="width:8%">阶段</th><th style="width:30%">做什么</th><th style="width:30%">载体（可以很土）</th><th>出口判据</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="tag solid">P0</span></td>
+          <td><b>工作流闭环</b>：定主题 → 生成清单 → 手动喂素材 → 打勾 → 齐了 → 出草稿 → 跳发布页</td>
+          <td>托盘菜单 + 一个本地页面（或干脆手动复制粘贴都行）。<b>不做常驻 UI</b></td>
+          <td><b>用一期真主题跑完并真的发出去</b>；攒齐的素材能直接进排版，不用回头再找</td>
+        </tr>
+        <tr>
+          <td><span class="tag blue">P1</span></td>
+          <td><b>把喂素材融进浏览动作</b>：划选 → 原地选择「喂给哪一项」，不切页面、不建任务</td>
+          <td>划选浮层（不常驻，用完即走）</td>
+          <td>喂一次 ≤2 次操作；浏览器焦点与选区不被破坏</td>
+        </tr>
+        <tr>
+          <td><span class="tag new">P2</span></td>
+          <td><b>悬浮球</b>：把「未完成」钉在角落，常驻提醒</td>
+          <td>独立置顶小窗，须避免激活（不抢焦点）</td>
+          <td>连续两天愿意开着它；且显示/点击时浏览器光标与选区不丢</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="k" style="margin-top:10px">注意 P0 的载体是<b>故意做土</b>的：如果土载体下你依然愿意喂素材，说明闭环本身有价值，那时再投入做球才划算；如果土载体下你一次都不喂，做球也救不回来。</div>
+  </div>
+
+  <div class="card">
+    <h2>P0 的最小数据对象（先只建这两张表）</h2>
+    <div class="note">不碰既有任务表，也不引入任何 AI / 浏览器依赖。</div>
+    <table>
+      <thead><tr><th style="width:24%">对象</th><th>字段（建议）</th></tr></thead>
+      <tbody>
+        <tr><td><b>Topic</b>（一期）</td><td>id · 主题名 · 目标平台 · 目标形态（图文/视频）· 张数目标 · 状态（进行中/已发布/弃稿）· 创建时间</td></tr>
+        <tr><td><b>ChecklistItem</b>（素材项）</td><td>id · topic_id · 名称 · 提示（要什么样的素材）· 是否完成 · <b>素材原文</b> · 素材来源（URL/标题）· 采集时间</td></tr>
+      </tbody>
+    </table>
+    <div class="k" style="margin-top:10px">「素材原文 + 来源」这两列是 P0 的成败点：<b>没有原文的打勾等于没打</b> —— 齐了却拼不出内容，正是最容易自欺的地方。</div>
+  </div>
+
+  <div class="card">
+    <h2>红线的技术翻译</h2>
+    <div class="note">把 requirements §3 翻译成实现期的硬约束，避免做着做着越界。</div>
+    <ul class="tight">
+      <li><span class="tag new">禁止</span> AI 替你发送任何内容 —— 代码层面就是：<b>不存在</b>通往「发送」按钮的执行路径，只有通往「打开页面」的路径。</li>
+      <li><span class="tag new">禁止</span> 微信个人号、抖音私信接入 —— 不只是「先不做」，是依赖就不该引入。</li>
+      <li><span class="tag warn">克制</span> 不做成笔记软件 —— 判据：任何需要「先打开 orb 才能开始」的功能都不做。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 4 待拍板 ============ -->
+<section class="panel" id="p4">
+  <div class="card">
+    <h2>Q0~Q4：我的建议答案</h2>
+    <div class="note">Q0 是球后置之后新空出来的问题（P0 载体用什么），必须最先答；每项都给了默认建议和能立刻反驳它的那条事实。</div>
+    <table>
+      <thead><tr><th style="width:6%">#</th><th style="width:26%">问题</th><th style="width:38%">建议</th><th>反证 / 代价</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="mono">Q0</td>
+          <td><b>P0 的最小载体是什么</b><div class="k">球后置之后，这是空出来的新问题，必须先答</div></td>
+          <td><b>先不写桌面程序。</b>用一个本地 HTML 页面 + 手工/托盘入口跑完闭环即可。<br><span class="k">理由：P0 要验的是「你会不会喂、能不能攒齐」，不是工程能力；为了选栈而拖住验证，等于又让载体跑到闭环前面去了。</span></td>
+          <td>代价：P0 阶段没有常驻提醒，「忘了喂」这个变量测不到 —— 但这本来就是 P2 才要测的，不算损失。</td>
+        </tr>
+        <tr>
+          <td class="mono">Q1</td>
+          <td>P1/P2 的桌面部分用什么技术栈<div class="k">P0 之后才需要答</div></td>
+          <td>若要常驻/系统级接入，<b>沿用词镜那套</b>：Python 3.11 + Tk + pywin32/uiautomation + 原生 hook DLL。<br><span class="k">理由：本机唯一有完整交付（198/63 断言）的 Windows 桌面组合。</span></td>
+          <td>注意：requirements 里你说要「用之前复刻豆包 PC 版那套」，但我在桌面可见范围内（排除 node_modules）只找到 studentbuddy-v2 / ai-orchestrator 的 package.json，<b>均无 electron / tauri 痕迹</b>。说得清那套是什么的话以你为准。<br><b>另外：这次纠正说明「有验证证据」不等于「形态该被模仿」—— 选栈是工程问题，可以参照；定形态和定优先级不能参照。</b></td>
+        </tr>
+        <tr>
+          <td class="mono">Q2</td>
+          <td>素材清单谁列</td>
+          <td><b>AI 按主题生成模板，你改</b>。语料现成：E001~E024 排期 + 单篇 8 步 SOP，每项还能自动带「出口物判据」。</td>
+          <td>生成的清单可能看着合理但不贴合当天真实材料 → 允许一键重生成与手动加项，别锁死。</td>
+        </tr>
+        <tr>
+          <td class="mono">Q3</td>
+          <td>项目名</td>
+          <td>暂不改名。<span class="k">task-orb 把「任务清单」和「悬浮球」两个要素都说清了，改名不影响任何技术决策，可以等 P0 跑顺了再换。</span></td>
+          <td>唯一代价：以后对外叙事若要强调「费曼学习法闭环」，这个名字偏内部。</td>
+        </tr>
+        <tr>
+          <td class="mono">Q4</td>
+          <td>P0 用哪个真主题跑</td>
+          <td><b>优先 E004 游戏化编程网站</b>（已有 6 张真实站点截图，素材现成），次选 E005 MCP（本 demo 用的）。</td>
+          <td>E004 若你已不想发，换成 E005 也行，但要真打算发 —— 用假主题跑 P0，「愿不愿意开着」这个验收就失去意义。</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>下一步最小动作（按修正后的顺序）</h2>
+    <ol class="tight">
+      <li><b>拍板 Q0 与 Q4</b>：P0 用什么载体跑、用哪一期真主题跑。这两个不定，P0 动不了；而它们都不涉及技术栈。</li>
+      <li><b>用真主题跑一整圈</b>：定主题 → 清单 → 喂素材（哪怕手动复制粘贴）→ 齐了 → 出草稿 → 真的发出去。<b>不用写任何常驻 UI。</b></li>
+      <li><b>记录每一次「看到了但没喂」</b>，并归类为「没想起来」（P2 治）还是「不知道该喂给哪一项」（P0 就得修清单）。这两类的比例，才决定下一步该做球还是该改清单。</li>
+      <li><b>只有第 2 步成立</b>（确实攒出了能发的东西），才进 P1 把喂素材融进浏览动作；球留到最后。</li>
+    </ol>
+    <div class="k" style="margin-top:8px">被撤下的一条：原计划「先做悬浮球窗口探针（验证不抢焦点）」—— 那是 P2 的前置，不该排在 P0 之前。</div>
+  </div>
+</section>
+
+<!-- ============ 5 架构与选型 ============ -->
+<section class="panel" id="p5">
+  <div class="card">
+    <h2>架构结论先行（v0.4 修正：栈不定）</h2>
+    <div class="note">上一版给了「推荐方案 A/B/C」，被老板否掉了 —— 定位没钉之前不该定栈。本版只保留<b>现在就能确定的客观约束</b>，其余改为条件表。</div>
+    <div class="lead">
+      <b>现在能定的只有一条：这是个分层的东西，其中「采集层必须进操作系统」。</b>其余（主栈、UI、进程模型）<b>一律等定位钉清后再定</b>，一步步来。<br>
+      <b>能确定的第二条：它确实是三种性质完全不同的活</b> —— 采集碰操作系统、组织碰数据、发布只是跳个 URL。硬塞一个栈，只会让最简单的部分被最难的部分拖着走。
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>为什么现在不该定栈</h2>
+    <div class="note">这条是老板的裁定，理由是「可以等产品定位然后一步步决定」。补上理由的那一半。</div>
+    <ul class="tight">
+      <li><b>栈是定位的函数，不是自由的。</b>「个人自用工具」和「要给别人跑的 AI 应用」需要的栈几乎不重叠；定位没定就选栈，等于在猜答案。</li>
+      <li><b>但有一条例外：先跑一个可行性探针不算定栈。</b>如果某条栈有致命不确定性（例：Rust 下 TSF/COM 的 bindings 稀缺），可以在定位定清前先探一下，探完就知道这条要不要从候选里划掉 —— 这是<b>排除</b>，不是<b>选定</b>。</li>
+      <li><b>P0 完全不受影响。</b>P0 是跑通工作流，土载体即可；栈定不定都不阻塞它。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>Java 方向的内部候选（条件表，未定）</h2>
+    <div class="note">老板问「Java 有没有更适合的」。Java 不是单一选择，下面四个的适用<b>定位</b>完全不同 —— 所以没法在不谈定位的前提下推荐。</div>
+    <table>
+      <thead><tr><th style="width:20%">候选</th><th style="width:30%">适合什么定位</th><th>代价</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>Spring Boot</b></td>
+          <td>定位是<b>「求职用的 AI 应用代表作」</b>；且要与你正在做的模型用量网关联动成体系</td>
+          <td>启动慢、常驻内存大（对个人小工具偏重）。但 <b>JD 命中最高</b>——Spring 在 AI 应用岗是硬通货。</td>
+        </tr>
+        <tr>
+          <td><b>极轻框架</b><div class="k">Javalin / Spark Java</div></td>
+          <td>定位是<b>「自己每天开着的轻工具，顺带是 Java 作品」</b>：单 jar 几 MB、秒起、本地服务 + 浏览器工作台</td>
+          <td>简历上不够「企业级」。但<b>能写成一篇 ADR</b>（「为什么不上 Spring Boot」）—— 你在网关项目里已认定这类决策记录是加分动作。</td>
+        </tr>
+        <tr>
+          <td><b>Quarkus / Micronaut</b></td>
+          <td>定位是<b>「要 Java 但要轻、甚至要原生镜像」</b>：启动快、内存小</td>
+          <td>生态与资料少于 Spring，JD 命中低（写 Quarkus 不如 Spring Boot 被认）。</td>
+        </tr>
+        <tr>
+          <td><b>JavaFX</b></td>
+          <td>定位是<b>「纯桌面应用」且要单一语言</b></td>
+          <td>系统级 hook 要走 JNI，复杂度跳一档；桌面分发重（内嵌 JRE）。</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="k" style="margin-top:10px">注意一个反直觉的点：<b>Spring Boot 和极轻框架的分歧不在技术，在「这个作品要给谁看」</b> —— 给面试官看选前者，给自己每天用选后者。所以它是定位问题。</div>
+  </div>
+
+  <div class="card">
+    <h2>五个定位变量，各自怎么决定栈</h2>
+    <div class="note">定位钉清 = 把这五个问题答完。答完之后栈基本是唯一解，不需要「选」。</div>
+    <table>
+      <thead><tr><th style="width:26%">定位问题</th><th style="width="36%">答法 A → 栈倾向</th><th>答法 B → 栈倾向</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>① 它给谁用</b></td>
+          <td><b>只给自己</b> → 极轻、单文件、能跑就行；分发可以不解决</td>
+          <td><b>要给别人看/跑</b> → 必须解决分发（打包/安装），栈要选「别人装得上」的</td>
+        </tr>
+        <tr>
+          <td><b>② 要不要联网/多端</b></td>
+          <td><b>纯本地</b> → 不需要真正的服务端，Java 后端价值下降</td>
+          <td><b>要多端/同步</b> → 必须有服务端，<b>Java 后端才真正有意义</b>（这是 Java 方案成立的前提）</td>
+        </tr>
+        <tr>
+          <td><b>③ 简历上代表什么能力</b></td>
+          <td><b>后端工程</b>（Spring/并发/SQL/接口封装）→ Java</td>
+          <td><b>系统级/桌面能力</b>（钩子、COM、不抢焦点）→ 原生栈（Rust/C#），Java 反而不合适</td>
+        </tr>
+        <tr>
+          <td><b>④ 要不要与网关联动</b></td>
+          <td><b>联动</b>（AI 调用走自己的模型用量网关）→ 服务化，Java 天然合适，且两项目互证成体系</td>
+          <td><b>独立</b>（自己直接调模型）→ 无所谓栈，轻便优先</td>
+        </tr>
+        <tr>
+          <td><b>⑤ 「多平台」是真做还是只跳转</b></td>
+          <td><b>只跳转</b>（当前红线下的现实）→ 平台=字段，不需要抽象层</td>
+          <td><b>将来真接入</b> → 才需要平台适配架构，且那时才值得为它选栈</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="k" style="margin-top:10px">其中 <b>② 和 ③ 是最强的两个</b>：只要「不要服务端」＋「代表系统级能力」，Java 方案就应该整个划掉 —— 那时该走原生栈。反过来只要「要服务端」＋「代表后端工程」，Java 就是唯一合理的主栈。</div>
+  </div>
+
+  <div class="card">
+    <h2>最重要的一条判断：「多平台」现在是个字段，不是一套架构</h2>
+    <div class="note">这条如果不先钉死，架构会立刻膨胀成一堆永远不会被调用的适配器。</div>
+    <table>
+      <thead><tr><th style="width:30%">听起来要做的</th><th style="width:34%">实际能做的（受限于红线）</th><th>所以架构上该做的</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>接入抖音 / 小红书 / B站 / 微信</td>
+          <td>微信个人号<b>无官方 API</b>（协议登录必封）；抖音私信接口<b>只对认证企业号</b>开放 —— requirements §3 已列为红线</td>
+          <td><b>不做平台适配器。</b>「平台」退化为一张表：名称 + 发布页 URL + 文案规格差异</td>
+        </tr>
+        <tr>
+          <td>一键发布</td>
+          <td>只能跳到发布页；<b>发送永远真人</b>（P-001 原话）</td>
+          <td>执行器只有 <code>open_url</code> 一个动作，没有写操作客户端</td>
+        </tr>
+        <tr>
+          <td>评论/私信监测</td>
+          <td>P2 才碰；且只做「提醒 + 给草稿」，不做代回</td>
+          <td>预留<b>数据字段</b>（平台名、来源 URL），<b>不预留</b>抽象接口</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="k" style="margin-top:10px"><b>判据：等真的出现第二个平台、且两者行为确实不同时，再抽抽象层。</b>现在抽，抽出来的形状一定是猜的 —— 这是最容易白做的一类架构。</div>
+  </div>
+
+  <div class="card">
+    <h2>四层拆解：哪层必须原生，哪层待定</h2>
+    <div class="note">只有 L1 的<b>约束</b>是确定的（必须进操作系统），语言仍待定；L2/L3/L4 的选型随定位走，本表只标「已确定的性质」，不标结论。</div>
+    <table>
+      <thead><tr><th style="width:8%">层</th><th style="width:22%">职责</th><th style="width:26%">选型</th><th>为什么（确定的性质）</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="tag new">L1</span></td>
+          <td><b>采集</b>：读浏览器正文/选区、划选捕获、OCR 兜底</td>
+          <td><b>必须原生</b>（语言待定）<div class="k">候选：复用现有 Python / Rust / C#</div></td>
+          <td><b>Web 技术做不到</b>—— 这一层必须进操作系统。<span class="tag solid">这是全表唯一现在就能定的一条</span></td>
+        </tr>
+        <tr>
+          <td><span class="tag blue">L2</span></td>
+          <td><b>数据</b>：Topic / 清单项 / 素材原文</td>
+          <td><b>关系型、单文件</b><div class="k">SQLite 本机 3.53.1 可用；语言绑定待定</div></td>
+          <td>要按主题查、按状态筛、按平台汇总 —— 是<b>查询</b>场景，不是日志追加。备份＝拷一个文件。<br><span class="k">注：词镜用 JSONL 是因为它记的是流式输入事件，场景不同，别照抄。</span></td>
+        </tr>
+        <tr>
+          <td><span class="tag blue">L3</span></td>
+          <td><b>应用</b>：工作台（清单/素材/草稿）+ 常驻提醒（P2）</td>
+          <td><b>待定</b>，但两块性质不同</td>
+          <td>工作台富交互（表格+长文+缩略图）；常驻提醒要控制不抢焦点。<b>两者可分开做、互不影响</b> —— 这条性质不受选型影响。</td>
+        </tr>
+        <tr>
+          <td><span class="tag ok">L4</span></td>
+          <td><b>外部</b>：LLM 出草稿、跳发布页</td>
+          <td><b>HTTP + open_url</b>（几乎与语言无关）</td>
+          <td>不自研模型、不做平台写操作。<b>这一层对选型几乎没有约束力</b> —— 别让它参与栈的决策。</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>候选池（不作推荐，只记排除条件）</h2>
+    <div class="note">按「多个简单方案组合」而不是「一个复杂方案」的思路列着。<b>选定要等定位钉清</b>；这里只写「什么情况下这条该被划掉」。</div>
+    <table>
+      <thead><tr><th style="width:6%">#</th><th style="width:22%">候选</th><th style="width:34%">内容</th><th>什么情况下划掉它</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="tag blue">①</span></td>
+          <td>分层选型</td>
+          <td>L1 原生（语言待定）；L2 SQLite；L3 本地 Web 工作台 + 原生常驻小窗；L4 兼容接口</td>
+          <td>若定位定为「纯本地、不要服务端」且要单一语言 → 分层带来的多语言成本不划算。</td>
+        </tr>
+        <tr>
+          <td><span class="tag blue">②</span></td>
+          <td>Java 主体 + 薄原生采集端</td>
+          <td>工作流/数据/AI 编排用 Java；采集端另起小进程（复用现有 Python 或另写）</td>
+          <td>若定位定为<b>「不要服务端」</b>或<b>「代表系统级/桌面能力」</b> → 整个划掉（那时 Java 无处施展）。</td>
+        </tr>
+        <tr>
+          <td><span class="tag blue">③</span></td>
+          <td>原生单栈（Rust / C#）</td>
+          <td>采集与 UI 一条栈打通，无服务化</td>
+          <td>若定位定为「要服务端/要与网关联动」→ 划掉；另 Rust 在目标 JD 上命中低，且 TSF/COM bindings 稀缺（需先过探针）。</td>
+        </tr>
+        <tr>
+          <td><span class="tag blue">④</span></td>
+          <td>全 Python + Tk</td>
+          <td>单一语言、单一栈，心智负担最小</td>
+          <td>若定位要求<b>「构成新的代表作」</b> → Python 已有代表作，直接划掉。另：工作台富交互（表格+长文+缩略图）用 Tk 做会很痛。</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="k" style="margin-top:10px">有一条与候选无关的硬约束仍然成立：<b>把「最难且不确定的」（采集）和「最简单但会变的」（界面/工作流）分开</b>。无论最后选哪个候选，这两块都不该绑死 —— 采集万一走不通，其余部分还能活。</div>
+  </div>
+
+  <div class="card">
+    <h2>进程模型（随定位定，但有一条性质先记下）</h2>
+    <div class="note">下表画的是「本地常驻」形态下的样子；若定位定为服务端/多端，形态会变。<b>不受选型影响的那条性质写在表下。</b></div>
+    <table>
+      <thead><tr><th style="width:26%">进程</th><th style="width:30%">职责</th><th>为什么分开</th></tr></thead>
+      <tbody>
+        <tr><td><b>采集常驻进程</b><div class="k">含原生 hook</div></td><td>盯输入与选区，写 L2</td><td>钩子是最容易崩的部分。它崩了不该把工作台一起带走；也方便单独重启、单独卸载。</td></tr>
+        <tr><td><b>UI / 工作台进程</b><div class="k">按需启动</div></td><td>清单管理、素材浏览、草稿生成</td><td>用不着就不必常驻内存。P0 甚至可以完全没有这个进程。</td></tr>
+      </tbody>
+    </table>
+    <div class="k" style="margin-top:10px">通信用 <b>SQLite + 本地 HTTP</b>：两个进程都读写同一个库文件，UI 进程通过 localhost 调采集进程的少量动作。既有先例可参考：词镜用子进程 + stdin/stdout JSON 传命令（<code>cijing_desktop.py:78</code>），系统层用有界共享通道 —— 说明这类跨进程结构在你机器上跑得通。<br>
+<b>★ 与选型无关的一条：采集端应独立成进程。</b>它是唯一会碰全局钩子的部分，最容易崩；它崩了不该带走其余部分，也方便单独重启与单独卸载。这条在任何候选下都成立。</div>
+  </div>
+
+  <div class="card">
+    <h2>P0 阶段架构上真正要定的只有两件事</h2>
+    <div class="note">其余全是 P1 之后的事。现在定多了就是猜。</div>
+    <ul class="tight">
+      <li><b>两张表</b>：<code>Topic</code>（主题/平台/目标形态/状态）与 <code>ChecklistItem</code>（名称/提示/是否完成/<b>素材原文</b>/来源）。平台在这一阶段就是 <code>Topic.platform</code> 一个字符串字段。</li>
+      <li><b>素材原文必填</b>：没原文的打勾不算完成。这是唯一一条会影响表结构的硬约束 —— 它决定「齐了」是不是真的齐了。</li>
+    </ul>
+    <div class="k" style="margin-top:8px">不需要定：<b>技术栈、主语言、UI 栈、进程模型、采集方式、AI 接口</b> —— 这些都要等定位钉清，或者答案本来就会变。<b>P0 甚至可以只是一个本地 HTML 页面 + 手动粘贴，跑完就算数。</b></div>
+    <div class="k" style="margin-top:8px">★ 顺序提醒（老板裁定）：<b>先钉产品定位 → 再一步步定栈</b>。P0 验证价值、定位问答、技术探针这三条可以并行，互不阻塞；但「选定主栈」必须排在定位之后。</div>
+  </div>
+
+  <div class="card">
+    <h2>架构红线（与 requirements §3 对齐）</h2>
+    <ul class="tight">
+      <li><span class="tag new">禁止</span> <b>任何平台的写操作客户端</b>。代码里不存在通往「发送」按钮的路径，只有通往「打开页面」的路径 —— 这条在架构层就要卡死，不能靠调用时自觉。</li>
+      <li><span class="tag new">禁止</span> 私有协议接微信/抖音私信。不只是"先不做"，是<b>依赖就不该引入</b>（引入即封号风险）。</li>
+      <li><span class="tag warn">克制</span> 不做插件体系 / 不做平台抽象层 / 不做多用户。个人先用顺手（P-003），架构上留字段、不留框架。</li>
+    </ul>
+  </div>
+</section>
+
+<footer>
+  task-orb 调研验证 Demo v0.4.0 ｜ 数据源：<code>Desktop\task-orb\docs\requirements.md</code> v0.3.0、<code>Desktop\词镜交付\当前版本</code>（manifest v0.5.0 / docs/product.md P-011 / app/system/README.md）、<code>Desktop\奶蛙视频账号</code>、<code>Desktop\llwan的个人开发文档\META.md</code>、<code>Desktop\Omnilex\SPEC.md §1.1</code> ｜
+  单文件零依赖、无外链、无 emoji、可断网打开 ｜ 本页所有「未实现／设计态」标签均为警戒性标注，不代表任何功能已落地。
+</footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------------- 主题 ---------------- */
+  var themeBtn = document.getElementById('themeBtn');
+  themeBtn.addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme');
+    document.documentElement.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
+  });
+
+  /* ---------------- Tab ---------------- */
+  var nav = document.getElementById('nav');
+  nav.addEventListener('click', function(e){
+    var b = e.target.closest('button'); if(!b) return;
+    [].forEach.call(nav.children, function(x){ x.classList.remove('on'); });
+    b.classList.add('on');
+    [].forEach.call(document.querySelectorAll('.panel'), function(p){ p.classList.remove('on'); });
+    document.getElementById(b.dataset.p).classList.add('on');
+  });
+
+  /* ---------------- 任务状态 ---------------- */
+  var TASK = {
+    title: 'E005 · MCP 到底创新在哪',
+    sub: '本期任务 · 素材清单 4 项 · 目标：抖音图文 7 张',
+    items: [
+      {id:0, name:'一句话反常识结论', hint:'能让人站队的那种', done:false, ev:null},
+      {id:1, name:'一张对照表素材', hint:'它 vs 旧做法差在哪', done:false, ev:null},
+      {id:2, name:'一个可核实的真实现象', hint:'谁在用 / 官方原文片段', done:false, ev:null},
+      {id:3, name:'封面大字 + 奶蛙姿势', hint:'按 E0~E4 表情库挑一个', done:false, ev:null}
+    ]
+  };
+
+  var CHECK = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg>';
+  var itemList = document.getElementById('itemList');
+  var feedBtn  = document.getElementById('feedBtn');
+  var draftBox = document.getElementById('draftBox');
+  var draftTxt = document.getElementById('draftText');
+  var orb      = document.getElementById('orb');
+  var orbPct   = document.getElementById('orbPct');
+  var orbBadge = document.getElementById('orbBadge');
+  var ringArc  = document.getElementById('ringArc');
+  var panel    = document.getElementById('orbPanel');
+  var CIRC     = 169.6;
+
+  function doneCount(){ return TASK.items.filter(function(i){ return i.done; }).length; }
+
+  function renderItems(){
+    var html = '';
+    TASK.items.forEach(function(it){
+      html += '<div class="item'+(it.done?' done':'')+'" data-i="'+it.id+'">'
+            +   '<div class="box">'+CHECK+'</div>'
+            +   '<div class="tx"><b>'+it.name+'</b><i>'+it.hint+'</i></div>'
+            + '</div>';
+      if(it.done && it.ev){
+        html += '<div class="evidence">素材 · '+it.ev+'</div>';
+      }
+    });
+    itemList.innerHTML = html;
+  }
+
+  function renderProgress(){
+    var d = doneCount(), t = TASK.items.length;
+    orbPct.textContent = d + '/' + t;
+    ringArc.setAttribute('stroke-dashoffset', String(CIRC - CIRC * d / t));
+    var all = (d === t);
+    orb.classList.toggle('ready', all);
+    orbBadge.classList.toggle('on', !all && d > 0);
+    if(!all) orbBadge.textContent = String(t - d);
+    feedBtn.disabled = !all;
+    draftBox.style.display = all ? 'block' : 'none';
+    if(all){
+      var evs = TASK.items.map(function(i){ return i.ev; });
+      draftTxt.textContent =
+        '今天奶蛙给你讲清楚 MCP。\n' +
+        '封面大字候选：「它不是函数调用的替代品。」\n' +
+        '第 2 张卡痛点：你已经能接数据库了，为什么还要套一层？\n' +
+        '第 3~5 张：对照表（发现能力 / 使用能力）+ 结论卡。\n' +
+        '尾卡：就这。下篇讲 ' + (TASK.items[1].ev ? '它不负责的那三件事' : 'TODO') + '。\n\n' +
+        '已从你划选的原文里取到：\n' +
+        evs.map(function(e, n){ return '· 卡'+(n+1)+'：' + (e ? e.slice(0, 46) + (e.length>46?'…':'') : '（缺素材）'); }).join('\n');
+    }
+  }
+
+  function render(){ renderItems(); renderProgress(); }
+
+  itemList.addEventListener('click', function(e){
+    var row = e.target.closest('.item'); if(!row) return;
+    var it = TASK.items[+row.dataset.i];
+    it.done = !it.done;
+    if(!it.done) it.ev = null;
+    render();
+  });
+
+  orb.addEventListener('click', function(e){
+    e.stopPropagation();
+    var open = panel.classList.toggle('on');
+    if(open && doneCount() === TASK.items.length){
+      orb.classList.remove('pulse');
+      void orb.offsetWidth;
+      orb.classList.add('pulse');
+    }
+  });
+
+  document.getElementById('clearBtn').addEventListener('click', function(){
+    TASK.items.forEach(function(i){ i.done = false; i.ev = null; });
+    render();
+  });
+
+  ['pubDy','pubBili','pubXhs'].forEach(function(id){
+    var map = {pubDy:'抖音创作服务平台', pubBili:'B站投稿页', pubXhs:'小红书发布页'};
+    document.getElementById(id).addEventListener('click', function(){
+      alert('演示环境不真的打开网页。\n\n真实实现里这一步调用的就是现有的 computer.open_url 执行器\n（app/desktop/native_tools.py:19-20）\n\n目标：' + map[id]);
+    });
+  });
+
+  /* ---------------- 划选喂素材 ---------------- */
+  var stage    = document.getElementById('stage');
+  var article  = document.getElementById('article');
+  var feedMenu = document.getElementById('feedMenu');
+  var selPrev  = document.getElementById('selPreview');
+  var optList  = document.getElementById('optList');
+
+  function hideMenu(){ feedMenu.classList.remove('on'); }
+
+  function placeMenu(rect, srect){
+    var top  = rect.bottom - srect.top + 8;
+    var left = rect.left - srect.left;
+    if(left + 250 > srect.width - 12) left = srect.width - 262;
+    if(left < 12) left = 12;
+    if(top + 220 > srect.height) top = Math.max(12, rect.top - srect.top - 226);
+    feedMenu.style.top = top + 'px';
+    feedMenu.style.left = left + 'px';
+  }
+
+  article.addEventListener('mouseup', function(){
+    var sel = window.getSelection();
+    var txt = sel ? String(sel).trim() : '';
+    if(txt.length < 6){ hideMenu(); return; }
+    var rect  = sel.getRangeAt(0).getBoundingClientRect();
+    var srect = stage.getBoundingClientRect();
+    selPrev.textContent = txt.length > 90 ? txt.slice(0, 90) + '…' : txt;
+    var html = '';
+    TASK.items.forEach(function(it){
+      html += '<button class="opt'+(it.done?' done':'')+'" data-i="'+it.id+'">'
+            + (it.done ? '[已填] ' : '') + it.name + '</button>';
+    });
+    optList.innerHTML = html;
+    placeMenu(rect, srect);
+    feedMenu.classList.add('on');
+    feedMenu.dataset.txt = txt;
+  });
+
+  optList.addEventListener('click', function(e){
+    var b = e.target.closest('button.opt'); if(!b) return;
+    var it = TASK.items[+b.dataset.i];
+    it.done = true;
+    it.ev = feedMenu.dataset.txt || '';
+    hideMenu();
+    window.getSelection().removeAllRanges();
+    panel.classList.add('on');
+    render();
+  });
+
+  document.addEventListener('mousedown', function(e){
+    if(!feedMenu.contains(e.target) && e.target !== article && !article.contains(e.target)) hideMenu();
+  });
+
+  /* ---------------- 分步播放器 ---------------- */
+  var STEPS = [
+    {d:'<b>1 · 定主题</b>：先钉这一期要发什么。球上只有主题，没有清单 —— 此时它不占用任何注意力，只是钉在角落。'},
+    {d:'<b>2 · 生成素材清单</b>：由 AI 按主题生成模板（语料来自奶蛙 E001~E024 排期与单篇 SOP），你改到顺手为止。清单的本质＝「发这一期到底缺什么」。'},
+    {d:'<b>3 · 浏览顺手喂素材</b>：你正常上网，看到合适的就在文章里<b>划选一段</b>，松开鼠标后选「喂给哪一项」。这一步的能力已经存在于现有系统级实现里（划选 → 就地处理），只是出口要换成清单 —— 但注意：参照的是它「不切上下文」的原则，不是那张卡的样式。'},
+    {d:'<b>4 · 清单打勾</b>：每一项被打勾时，把划选的原文存成这条素材的证据。球上的进度环实时推进，未完成数就是它的提醒强度。'},
+    {d:'<b>5 · 齐了 → 提醒</b>：全部打勾后球变为强调色并轻微脉冲一次 —— 只提醒一次，不做推送轰炸。对应 P-005「清单完成就提醒可以去发布了」。'},
+    {d:'<b>6 · 跳发布页 + 建议</b>：给出奶蛙语气的草稿建议，并一键跳各平台发布页（底层就是 computer.open_url）。<b>发送动作永远由你本人完成</b> —— 这是 P-001 原话，也是第一条红线。'}
+  ];
+  var curStep = 0;
+  var stepdesc = document.getElementById('stepdesc');
+  var hintline = document.getElementById('hintline');
+
+  function applyStep(n){
+    curStep = Math.max(0, Math.min(STEPS.length - 1, n));
+    [].forEach.call(document.getElementById('steps').children, function(b, i){
+      b.classList.toggle('on', i === curStep);
+    });
+    stepdesc.innerHTML = STEPS[curStep].d;
+
+    var allDone = false, partial = -1;
+    if(curStep === 0){ }
+    if(curStep === 1){ }
+    if(curStep === 2){ hintline.classList.add('on'); }
+    else { hintline.classList.remove('on'); }
+    if(curStep === 3){ partial = 2; }
+    if(curStep >= 4){ allDone = true; }
+
+    TASK.items.forEach(function(it, i){
+      it.done = allDone ? true : (partial > 0 ? i < partial : false);
+      if(!it.done) it.ev = null;
+      else if(!it.ev){
+        it.ev = [
+          '不是函数调用的替代品 —— 集成层的最小公约数',
+          '对照：发现能力 / 使用能力被标准化 vs 旧做法逐个重写',
+          '起量条件：同一份能力要接进多个不同宿主时才成立',
+          '封面：奶蛙 E0 看透一切 + 大字「它不是替代品」'
+        ][i] || '（分步演示预置素材）';
+      }
+    });
+    render();
+    panel.classList.toggle('on', curStep >= 1);
+  }
+
+  document.getElementById('steps').addEventListener('click', function(e){
+    var b = e.target.closest('button'); if(!b) return;
+    applyStep(+b.dataset.s);
+  });
+  document.getElementById('prevBtn').addEventListener('click', function(){ applyStep(curStep - 1); });
+  document.getElementById('nextBtn').addEventListener('click', function(){ applyStep(curStep + 1); });
+  document.getElementById('resetBtn').addEventListener('click', function(){
+    TASK.items.forEach(function(i){ i.done = false; i.ev = null; });
+    panel.classList.remove('on');
+    applyStep(0);
+  });
+
+  render();
+  applyStep(0);
+})();
+</script>
+</body>
+</html>

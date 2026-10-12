@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Skein · AI 剪辑 / 自媒体开源生态调研</title>
+<style>
+/* 设计取 Skein 同一套语言：暖墨画布、发丝边界、单一强调色、灰度分层。
+   不用渐变、不用彩色块、不做"科技感"装饰。 */
+:root{
+  --bg:#0a0a0f; --surf:#141313; --surf2:#1b1a18; --hair:#2a2724; --hair2:#3d3833;
+  --fg:#f2ece1; --fg2:#b3a894; --fg3:#7c7365;
+  --gold:#FFD01F; --green:#9ecf4e; --amber:#e8a800; --red:#e8785f; --blue:#86b6e6; --violet:#b9a0f0;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
+  font-family:"Microsoft YaHei UI","Segoe UI",system-ui,sans-serif;font-size:14px;line-height:1.65;}
+a{color:var(--blue);text-decoration:none;border-bottom:1px solid rgba(134,182,230,.28)}
+a:hover{border-bottom-color:var(--blue)}
+.wrap{max-width:1180px;margin:0 auto;padding:0 26px 90px}
+
+/* ---------- 头 ---------- */
+header{padding:44px 0 22px;border-bottom:1px solid var(--hair)}
+.kicker{font-family:"Cascadia Mono",Consolas,monospace;font-size:11px;letter-spacing:2.2px;
+  color:var(--fg3);text-transform:uppercase}
+h1{margin:12px 0 8px;font-size:27px;font-weight:700;letter-spacing:.2px}
+h1 em{font-style:normal;color:var(--gold)}
+.lede{color:var(--fg2);max-width:820px;font-size:14.5px}
+.meta{margin-top:16px;display:flex;flex-wrap:wrap;gap:22px;
+  font-family:"Cascadia Mono",Consolas,monospace;font-size:11.5px;color:var(--fg3)}
+.meta b{color:var(--fg2);font-weight:600}
+
+/* ---------- Tab ---------- */
+nav.tabs{display:flex;gap:2px;margin:26px 0 0;border-bottom:1px solid var(--hair);flex-wrap:wrap}
+nav.tabs button{
+  appearance:none;background:none;border:none;border-bottom:2px solid transparent;
+  color:var(--fg3);font-family:inherit;font-size:13.5px;padding:11px 16px 12px;cursor:pointer;
+  letter-spacing:.2px}
+nav.tabs button:hover{color:var(--fg2)}
+nav.tabs button[aria-selected="true"]{color:var(--gold);border-bottom-color:var(--gold);font-weight:600}
+section[hidden]{display:none}
+section{padding-top:30px}
+
+h2{font-size:18px;margin:34px 0 6px;font-weight:700}
+h2:first-child{margin-top:4px}
+h2 .n{font-family:"Cascadia Mono",Consolas,monospace;font-size:12px;color:var(--gold);
+  margin-right:9px;font-weight:700}
+.sub{color:var(--fg3);font-size:12.5px;margin:0 0 16px}
+p{margin:10px 0}
+
+/* ---------- 卡片 / 网格 ---------- */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(316px,1fr));gap:12px;margin:14px 0 4px}
+.card{background:var(--surf);border:1px solid var(--hair);border-radius:11px;padding:14px 15px}
+.card .top{display:flex;align-items:baseline;gap:9px;margin-bottom:5px}
+.card .name{font-weight:600;font-size:13.5px;flex:1;word-break:break-all}
+.stars{font-family:"Cascadia Mono",Consolas,monospace;font-size:12.5px;color:var(--gold);
+  font-weight:700;white-space:nowrap}
+.card .desc{color:var(--fg2);font-size:12.5px;min-height:38px}
+.card .foot{margin-top:9px;padding-top:8px;border-top:1px solid var(--hair);
+  font-family:"Cascadia Mono",Consolas,monospace;font-size:11px;color:var(--fg3);
+  display:flex;justify-content:space-between;gap:8px}
+.tag{display:inline-block;font-family:"Cascadia Mono",Consolas,monospace;font-size:10.5px;
+  padding:1.5px 7px;border:1px solid var(--hair2);border-radius:5px;color:var(--fg3);
+  white-space:nowrap}
+.tag.hot{border-color:#4d4013;color:var(--gold)}
+.tag.mid{border-color:#3f5220;color:var(--green)}
+.tag.slow{border-color:#4a3a2a;color:var(--amber)}
+
+/* ---------- 流水线 ---------- */
+.pipe{margin:18px 0}
+.step{display:grid;grid-template-columns:190px 1fr;gap:16px;padding:15px 0;
+  border-top:1px solid var(--hair)}
+.step:last-child{border-bottom:1px solid var(--hair)}
+.step .label{padding-left:14px;position:relative}
+.step .label:before{content:"";position:absolute;left:0;top:6px;width:7px;height:7px;
+  border-radius:50%;border:1.6px solid var(--hair2)}
+.step.covered .label:before{background:var(--green);border-color:var(--green)}
+.step.partial .label:before{background:var(--amber);border-color:var(--amber)}
+.step.miss .label:before{background:transparent;border-color:var(--red)}
+.step .label b{display:block;font-size:13.5px}
+.step .label span{font-family:"Cascadia Mono",Consolas,monospace;font-size:10.5px;color:var(--fg3)}
+.step .body{color:var(--fg2);font-size:12.5px}
+.step .body .tools{margin-top:6px;display:flex;flex-wrap:wrap;gap:6px}
+
+/* ---------- 表格 ---------- */
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:12.5px}
+th,td{text-align:left;padding:10px 11px;border-bottom:1px solid var(--hair);vertical-align:top}
+th{font-family:"Cascadia Mono",Consolas,monospace;font-size:10.5px;letter-spacing:1.1px;
+  color:var(--fg3);text-transform:uppercase;font-weight:600}
+td.mono{font-family:"Cascadia Mono",Consolas,monospace;font-size:11.5px;color:var(--fg3)}
+tr.pick td{background:#16150f}
+tr.pick td:first-child{box-shadow:inset 2px 0 0 var(--gold)}
+
+/* ---------- 结论块 ---------- */
+.call{background:var(--surf2);border:1px solid #4d4013;border-radius:11px;padding:15px 17px;margin:16px 0}
+.call h3{margin:0 0 7px;font-size:14px;color:var(--gold)}
+.note{border-left:2px solid var(--hair2);padding:2px 0 2px 14px;color:var(--fg3);
+  font-size:12.5px;margin:14px 0}
+code{font-family:"Cascadia Mono",Consolas,monospace;font-size:12px;background:#1a1916;
+  border:1px solid var(--hair);border-radius:4px;padding:1px 5px;color:#ddd0b8}
+pre{background:#111110;border:1px solid var(--hair);border-radius:9px;padding:13px 15px;
+  overflow:auto;font-family:"Cascadia Mono",Consolas,monospace;font-size:11.5px;color:#c8bda8;line-height:1.6}
+ul{margin:9px 0;padding-left:20px;color:var(--fg2);font-size:13px}
+li{margin:5px 0}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-family:"Cascadia Mono",Consolas,monospace;
+  font-size:11px;color:var(--fg3);margin:12px 0}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;
+  vertical-align:middle;font-style:normal}
+footer{margin-top:52px;padding-top:20px;border-top:1px solid var(--hair);
+  font-family:"Cascadia Mono",Consolas,monospace;font-size:11px;color:var(--fg3)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Skein · 调研</div>
+  <h1>AI 剪辑 / 自媒体开源生态 —— 以及 <em>Skein 该接在哪一环</em></h1>
+  <p class="lede">
+    Skein 现在能做到「想清楚怎么讲」，然后停在封顶。这一份是把「真实的成片是怎么产出来的」摸一遍：
+    数据全部用 <code>gh</code> 从 GitHub 实时查，星数与最后提交时间是抓取当刻的真值；结论部分说明 Skein 该接哪条流水线、以及为什么。
+  </p>
+  <div class="meta">
+    <span><b>抓取方式</b> gh search repos</span>
+    <span><b>抓取时间</b> 2026-10-10</span>
+    <span><b>样本</b> 10 组关键词 / 去重后 40+ 仓库</span>
+  </div>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button role="tab" aria-selected="true" data-t="p1">01 · 生态全景</button>
+  <button role="tab" aria-selected="false" data-t="p2">02 · 一条真实流水线</button>
+  <button role="tab" aria-selected="false" data-t="p3">03 · Skein 该接哪</button>
+  <button role="tab" aria-selected="false" data-t="p4">04 · 数据与边界</button>
+</nav>
+
+<!-- ================= 01 ================= -->
+<section id="p1">
+  <h2><span class="n">01</span>生态全景：七个流派</h2>
+  <p class="sub">按「它接管了流水线的哪一环」分，不按语言/技术分。星数为 2026-10-10 实时值。</p>
+
+  <h2><span class="n">1.1</span>一键成片：给个主题，端到端吐视频</h2>
+  <p class="sub">最像"AI 自媒体"的形态：选题 → 脚本 → 配音 → 找素材 → 合成，全自动。也是 Skein 最容易被拿来对比的一类。</p>
+  <div class="grid">
+    <div class="card"><div class="top"><div class="name">harry0703/MoneyPrinterTurbo</div><div class="stars">129,356 ★</div></div>
+      <div class="desc">利用 AI 大模型和自动化工作流，根据主题或关键词一键生成高清短视频。</div>
+      <div class="foot"><span class="tag hot">当日仍在提交</span><span>Python</span></div></div>
+    <div class="card"><div class="top"><div class="name">YILS-LIN/short-video-factory</div><div class="stars">5,590 ★</div></div>
+      <div class="desc">一键生成产品营销与泛内容短视频，AI 批量自动剪辑，跨平台桌面工具。</div>
+      <div class="foot"><span class="tag hot">桌面端</span><span>2026-09-29</span></div></div>
+    <div class="card"><div class="top"><div class="name">SamurAIGPT/AI-Faceless-Video-Generator</div><div class="stars">513 ★</div></div>
+      <div class="desc">脚本 + 配音 + 数字人，纯 AI 生成不露脸视频。</div>
+      <div class="foot"><span class="tag mid">活跃</span><span>2026-09-17</span></div></div>
+    <div class="card"><div class="top"><div class="name">q1uki/MoneyPrinterAICreate</div><div class="stars">328 ★</div></div>
+      <div class="desc">在上者基础上接文生视频/图生视频，让分镜"动起来"而不是念 PPT。</div>
+      <div class="foot"><span class="tag slow">停滞</span><span>2026-02-25</span></div></div>
+  </div>
+  <div class="note">这一派的共同点：<b>内容由机器决定</b>。你给关键词，它替你写、替你选。Skein 的假设正相反——判断权在人。</div>
+
+  <h2><span class="n">1.2</span>文本驱动剪辑：用改文字来剪片子</h2>
+  <p class="sub">Descript 开创的范式：片子 = 可编辑的文本。删一句话 = 删掉对应音视频段。开源里这一派最成熟。</p>
+  <div class="grid">
+    <div class="card"><div class="top"><div class="name">OpenCut-app/OpenCut</div><div class="stars">93,363 ★</div></div>
+      <div class="desc">The open-source CapCut alternative。开源剪映替代，目前最大的一个。</div>
+      <div class="foot"><span class="tag mid">活跃</span><span>2026-09-24</span></div></div>
+    <div class="card"><div class="top"><div class="name">Augani/openreel-video</div><div class="stars">5,328 ★</div></div>
+      <div class="desc">纯浏览器剪辑器，免安装、不上传、无水印。</div>
+      <div class="foot"><span class="tag hot">活跃</span><span>2026-10-03</span></div></div>
+    <div class="card"><div class="top"><div class="name">WyattBlue/auto-editor</div><div class="stars">5,467 ★</div></div>
+      <div class="desc">自动检测静音并剪掉——口播稿最省事的"去废话"工具。</div>
+      <div class="foot"><span class="tag hot">当日仍在提交</span><span>CLI</span></div></div>
+    <div class="card"><div class="top"><div class="name">OpenNewsLabs/autoEdit_2</div><div class="stars">456 ★</div></div>
+      <div class="desc">文本驱动粗剪，导出 EDL / FCPXML 给专业剪辑软件。</div>
+      <div class="foot"><span class="tag slow">2 年没动</span><span>2024-03</span></div></div>
+  </div>
+
+  <h2><span class="n">1.3</span>代码生成视频：把片子写成程序</h2>
+  <p class="sub">适合"知识类 / 图文类"——正好是 Skein 对着的那个内容类型。可版本管理、可批量、可模板化。</p>
+  <div class="grid">
+    <div class="card"><div class="top"><div class="name">remotion-dev/remotion</div><div class="stars">62,860 ★</div></div>
+      <div class="desc">用 React 写视频。生态最全，字幕/B-roll/转场都有现成组件。</div>
+      <div class="foot"><span class="tag hot">当日仍在提交</span><span>TypeScript</span></div></div>
+    <div class="card"><div class="top"><div class="name">motion-canvas/motion-canvas</div><div class="stars">19,265 ★</div></div>
+      <div class="desc">用代码做精确动画，讲解类视频的利器（带可视化编辑器）。</div>
+      <div class="foot"><span class="tag mid">活跃</span><span>2026-07-02</span></div></div>
+    <div class="card"><div class="top"><div class="name">midrender/revideo</div><div class="stars">4,093 ★</div></div>
+      <div class="desc">Motion Canvas 的库化版本，可嵌进自己的产品里当渲染后端。</div>
+      <div class="foot"><span class="tag mid">活跃</span><span>2026-07-15</span></div></div>
+    <div class="card"><div class="top"><div class="name">haidrrrry/claude-remotion-skill</div><div class="stars">336 ★</div></div>
+      <div class="desc">教 Claude 用 Remotion 做动效视频的 Agent Skill：B-roll、字幕、音效。</div>
+      <div class="foot"><span class="tag mid">Skill 形态</span><span>2026-08-12</span></div></div>
+  </div>
+
+  <h2><span class="n">1.4</span>转写 / 字幕 / 切片</h2>
+  <p class="sub">所有"文本驱动"的地基。中文场景里 FunASR 系（FunClip）比 Whisper 系更贴。</p>
+  <div class="grid">
+    <div class="card"><div class="top"><div class="name">modelscope/FunClip</div><div class="stars">6,383 ★</div></div>
+      <div class="desc">FunASR 转写 + 字幕生成 + LLM 辅助剪辑，本地 Gradio 界面。</div>
+      <div class="foot"><span class="tag hot">活跃</span><span>2026-10-08</span></div></div>
+    <div class="card"><div class="top"><div class="name">RayFernando1337/MLX-Auto-Subtitled-Video-Generator</div><div class="stars">464 ★</div></div>
+      <div class="desc">Mac 上本地跑，一句话生成带字幕视频。</div>
+      <div class="foot"><span class="tag slow">停滞</span><span>2025-04</span></div></div>
+    <div class="card"><div class="top"><div class="name">nganlinh4/oneclick-subtitles-generator</div><div class="stars">242 ★</div></div>
+      <div class="desc">转写 + 翻译 + 声音克隆 + 渲染 + 背景图与音乐，一条龙。</div>
+      <div class="foot"><span class="tag hot">活跃</span><span>2026-09-30</span></div></div>
+  </div>
+
+  <h2><span class="n">1.5</span>解说 / 二创 / 拉片</h2>
+  <div class="grid">
+    <div class="card"><div class="top"><div class="name">linyqh/NarratoAI</div><div class="stars">11,342 ★</div></div>
+      <div class="desc">利用 AI 大模型，一键解说并剪辑视频（影视解说方向最热的开源项目）。</div>
+      <div class="foot"><span class="tag hot">活跃</span><span>2026-09-17</span></div></div>
+    <div class="card"><div class="top"><div class="name">zenstory-ai/video-recap-skills</div><div class="stars">561 ★</div></div>
+      <div class="desc">Claude Code skills：分镜检测 → ASR → VLM → 脚本 → TTS → ffmpeg 合成，<b>可选导出可编辑的剪映草稿</b>。</div>
+      <div class="foot"><span class="tag hot">参考价值高</span><span>2026-10-04</span></div></div>
+  </div>
+
+  <h2><span class="n">1.6</span>分镜 / 资产 / 草稿 —— 离 Skein 最近的一派</h2>
+  <p class="sub">这一派不直接出片，而是<strong>把"要怎么讲"变成结构化的东西</strong>，再交给剪辑软件执行。Skein 的位置在这里。</p>
+  <div class="grid">
+    <div class="card"><div class="top"><div class="name">ArcReel/ArcReel</div><div class="stars">5,410 ★</div></div>
+      <div class="desc">自部署视频工作台：小说/剧本 → 角色、场景、道具资产 → <b>分镜</b> → 视频 → 剪映草稿，带跨镜头一致性。</div>
+      <div class="foot"><span class="tag hot">形态最接近</span><span>2026-10-09</span></div></div>
+    <div class="card"><div class="top"><div class="name">GuanYixuan/pyJianYingDraft</div><div class="stars">4,514 ★</div></div>
+      <div class="desc">Python 生成/导出<b>剪映草稿</b>，构建全自动剪辑流水线（另有 pyCapCut）。</div>
+      <div class="foot"><span class="tag hot">关键接口</span><span>2026-09-26</span></div></div>
+    <div class="card"><div class="top"><div class="name">FireRedTeam/FireRed-OpenStoryline</div><div class="stars">3,471 ★</div></div>
+      <div class="desc">意图驱动的导演 Agent：自然语言 + LLM 规划 + 工具编排，人始终在环里（human-in-the-loop）。</div>
+      <div class="foot"><span class="tag mid">概念对照</span><span>2026-07-31</span></div></div>
+    <div class="card"><div class="top"><div class="name">renezander030/capcut-cli</div><div class="stars">853 ★</div></div>
+      <div class="desc">直接读写 <code>draft_content.json</code>：字幕、时间轴、倍速、音量、模板、长剪短。</div>
+      <div class="foot"><span class="tag hot">活跃</span><span>2026-10-09</span></div></div>
+    <div class="card"><div class="top"><div class="name">AkariLabs/akari-video</div><div class="stars">207 ★</div></div>
+      <div class="desc">AI 剪辑工具（Theia 系 monorepo），带素材库 lab。</div>
+      <div class="foot"><span class="tag hot">当日仍在提交</span><span>2026-10-09</span></div></div>
+    <div class="card"><div class="top"><div class="name">notinmood/JianyingDraft.PY · xiaoyiv/JianYingProDraft</div><div class="stars">208 ★ / 179 ★</div></div>
+      <div class="desc">两个更早的"按资源文件自动生成剪映草稿"实现。</div>
+      <div class="foot"><span class="tag slow">停滞</span><span>2024</span></div></div>
+  </div>
+
+  <h2><span class="n">1.7</span>Agent Skill 形态（新近冒出来的一层）</h2>
+  <div class="grid">
+    <div class="card"><div class="top"><div class="name">znyupup/ai-video-editing-skill</div><div class="stars">150 ★</div></div>
+      <div class="desc">喂原始素材，出成片。ffmpeg + Whisper + Vision API。</div>
+      <div class="foot"><span class="tag mid">Skill</span><span>2026-04-27</span></div></div>
+    <div class="card"><div class="top"><div class="name">chang416/cutcraft</div><div class="stars">52 ★</div></div>
+      <div class="desc">从原始素材 + 创作意图到一支通过校验的成片，全流程 skill。</div>
+      <div class="foot"><span class="tag mid">Skill</span><span>2026-08-14</span></div></div>
+  </div>
+</section>
+
+<!-- ================= 02 ================= -->
+<section id="p2" hidden>
+  <h2><span class="n">02</span>一条真实的流水线，和 Skein 现在的覆盖</h2>
+  <p class="sub">绿 = 现在已经做到；黄 = 做到一半；红 = 完全没做。</p>
+  <div class="legend">
+    <span><i style="background:#9ecf4e"></i>已覆盖（Skein 现有）</span>
+    <span><i style="background:#e8a800"></i>半覆盖</span>
+    <span><i style="background:#e8785f"></i>缺口</span>
+  </div>
+
+  <div class="pipe">
+    <div class="step covered">
+      <div class="label"><b>① 选题 / 立意</b><span>TOPIC</span></div>
+      <div class="body">这一期讲什么、最想让人记住哪一下。
+        <div class="tools"><span class="tag mid">Skein：立项 + payoff</span><span class="tag">人自己起名</span></div></div>
+    </div>
+
+    <div class="step covered">
+      <div class="label"><b>② 结构 / 分镜骨架</b><span>OUTLINE</span></div>
+      <div class="body">每段要回答什么问题、顺序怎么排、哪段够了。
+        <div class="tools"><span class="tag mid">Skein：叙事结构 + 手动编排 + 对话改结构</span>
+        <span class="tag">AI 提议 → 人裁决</span></div></div>
+    </div>
+
+    <div class="step partial">
+      <div class="label"><b>③ 素材收集</b><span>ASSETS</span></div>
+      <div class="body">截图、录屏、整段原文、B-roll——<b>真文件</b>要能进得来、找得到、能拖进剪辑软件。
+        <div class="tools"><span class="tag slow">Skein：现在只有文字（body 字符串，没有一次落盘）</span>
+        <span class="tag">缺：上传 / 拖入文件、缩略图、打开文件夹</span></div></div>
+    </div>
+
+    <div class="step covered">
+      <div class="label"><b>④ 逐段讲法</b><span>SCRIPT</span></div>
+      <div class="body">这一段具体怎么说——口语稿，不是要点。
+        <div class="tools"><span class="tag mid">Skein：现在的"草稿"是一坨文字</span>
+        <span class="tag hot">要改成：逐段口播稿</span></div></div>
+    </div>
+
+    <div class="step miss">
+      <div class="label"><b>⑤ 成片稿：分镜表</b><span>STORYBOARD</span></div>
+      <div class="body">一张表：<b>第几段｜口播稿｜要什么画面｜手上有没有</b>。这是"想清楚"交付给"动手剪"的那个物件。
+        <div class="tools"><span class="tag" style="border-color:#7a3b2c;color:#e8785f">Skein：完全没有</span>
+        <span class="tag">可导出 Markdown / 一键复制</span></div></div>
+    </div>
+
+    <div class="step miss">
+      <div class="label"><b>⑥ 配音 / 字幕 / 粗剪</b><span>ASSEMBLE</span></div>
+      <div class="body">口播稿 → TTS 或真人录音 → 转写对轴 → 去废话 → 加 B-roll。
+        <div class="tools"><span class="tag">FunClip / auto-editor / Remotion</span>
+        <span class="tag">Skein 不必自己做，但要能"交出去"</span></div></div>
+    </div>
+
+    <div class="step miss">
+      <div class="label"><b>⑦ 出片 / 发布</b><span>PUBLISH</span></div>
+      <div class="body">导出可编辑工程（剪映草稿 / FCPXML），或直接落到平台。
+        <div class="tools"><span class="tag">pyJianYingDraft / capcut-cli / autoEdit_2</span>
+        <span class="tag">Skein 现在只有：三个发布页链接</span></div></div>
+    </div>
+  </div>
+
+  <div class="call">
+    <h3>一句话诊断</h3>
+    <p style="margin:0">Skein 把 ①②④ 做得不错，<b>③ 素材只到文字、⑤⑥⑦ 整段是空的</b>。
+    也就是说：它帮你把"怎么讲"想清楚之后，<b>没有一个能交到剪辑软件手里的物件</b>。
+    这就是你说的「真正的成片 / 完整的成片素材」缺的那一段。</p>
+  </div>
+</section>
+
+<!-- ================= 03 ================= -->
+<section id="p3" hidden>
+  <h2><span class="n">03</span>Skein 该接在哪：三条路线</h2>
+  <p class="sub">按你选的「分镜表 + 逐段口播稿」和「上传 + 粘贴文字」来评估。把握度是我的判断，依据写在后一列。</p>
+
+  <table>
+    <thead><tr><th>路线</th><th>做什么</th><th>工作量大头</th><th>把握度 / 依据</th></tr></thead>
+    <tbody>
+      <tr class="pick">
+        <td><b>A · 分镜表 + 逐段口播稿</b><br><span class="tag hot">推荐</span></td>
+        <td>封顶后不再吐一坨草稿，而是逐段成表：口播稿 / 要什么画面 / 手上有没有；可导出 Markdown、可一键复制。素材支持上传文件与粘贴长文。</td>
+        <td>模型按段写稿 + 本地拼表；文件上传进 <code>assets\</code> 并做缩略图</td>
+        <td><b>高</b>。全在本机链路内：写稿是已有 LLM 通道，表格是纯拼装，文件是本地拷贝。不新增外部依赖，不引入"生成质量不可控"的环节。</td>
+      </tr>
+      <tr>
+        <td><b>B · A + 导出剪映草稿</b><br><span class="tag mid">第二步</span></td>
+        <td>在 A 之后，把分镜表编译成剪映工程：每段一块字幕卡 + 占位素材，直接在你惯用的剪映里改。</td>
+        <td>对齐 <code>draft_content.json</code> 结构（可抄 pyJianYingDraft 的格式）</td>
+        <td><b>中</b>。剪映草稿是无公开文档的私有格式，版本一变就可能失效；pyJianYingDraft(4.5k★) 与 capcut-cli(853★) 都活着，说明可行但需要持续跟版。建议做成"导出"而非"内置"。</td>
+      </tr>
+      <tr>
+        <td><b>C · 直接出片</b><br><span class="tag slow">不建议</span></td>
+        <td>脚本 → TTS → 自动配画面 → 合成 mp4。</td>
+        <td>等于自建一个 MoneyPrinterTurbo</td>
+        <td><b>低</b>。129k★ 的开源项目已经把这条路卷到极致；而且它<b>替人做完了判断</b>，与 Skein「判断权在人、AI 只提示」的立身之本冲突。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="call">
+    <h3>建议的落点</h3>
+    <ul style="margin:6px 0 0">
+      <li><b>做 A。</b>它是"想清楚"和"动手剪"之间那张缺失的纸 —— 也是你能立刻拿去拍、拿去剪的东西。</li>
+      <li><b>把素材从"文字"升级成"文件"。</b>拖入 / 选择文件 → 复制进 <code>%LOCALAPPDATA%\Skein\assets\</code> → 素材里显示缩略图 + 一个「打开文件夹」。这样剪映里能直接拖。</li>
+      <li><b>B 留作下一步的"导出"。</b>不在第一版做，但格式上照着 pyJianYingDraft 留好接口（分镜表已经是天然的数据源）。</li>
+      <li><b>对话已经能改结构了</b>，顺手让它也能改口播稿 —— 说"第 2 段太学术了"就直接改那段稿子。</li>
+    </ul>
+  </div>
+
+  <h2><span class="n">3.1</span>对标对象：钉住"抄谁的什么"</h2>
+  <p class="sub">按你项目里的规矩：功能必须有参照软件，钉死抄什么。</p>
+  <table>
+    <thead><tr><th>要抄的</th><th>抄谁</th><th>具体抄什么</th></tr></thead>
+    <tbody>
+      <tr><td>分镜表的字段构成</td><td class="mono">ArcReel 5.4k★</td><td>段落 / 口播 / 画面描述 / 资产是否齐 —— 但把它从"生成流程"里剥出来，只做成一张可交付的表</td></tr>
+      <tr><td>意图驱动 + 人始终在环</td><td class="mono">FireRed-OpenStoryline 3.5k★</td><td>自然语言指挥 → LLM 规划 → 明确列出要动什么 → 人确认（Skein 的「照做」已经是这个形状）</td></tr>
+      <tr><td>口播稿"去废话"</td><td class="mono">auto-editor 5.5k★</td><td>只参考它"用静音/停顿自动修剪"的思路，Skein 侧表现为给稿子标出可删句</td></tr>
+      <tr><td>剪映草稿格式</td><td class="mono">pyJianYingDraft 4.5k★</td><td>直接对齐 <code>draft_content.json</code> 的字段（B 阶段才用）</td></tr>
+      <tr><td>字幕/对轴</td><td class="mono">FunClip 6.4k★</td><td>中文优先用 FunASR 而非 Whisper（只在真要做字幕时才接）</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ================= 04 ================= -->
+<section id="p4" hidden>
+  <h2><span class="n">04</span>数据与边界（这份调研可信到什么程度）</h2>
+
+  <h2><span class="n">4.1</span>怎么取的</h2>
+  <pre>gh search repos "AI video editing"      --limit 10 --json fullName,stargazersCount,pushedAt,description,language
+gh search repos "text based video editing" ...
+gh search repos "faceless video generator" ...
+gh search repos "MoneyPrinterTurbo" / "NarratoAI" / "FunClip" / "剪映 草稿" / "remotion" ...
+
+共 10 组关键词，去重后 40+ 仓库；本页只保留与"成片产出"直接相关的。</pre>
+  <p class="sub">全部走 GitHub API（<code>gh</code> CLI，已登录），星数与 <code>pushedAt</code> 是抓取当刻的值，未做人工美化。</p>
+
+  <h2><span class="n">4.2</span>这份调研<b>不能</b>说明什么</h2>
+  <div class="call" style="border-color:#4a3a2a">
+    <h3 style="color:var(--amber)">三条边界，先说清楚</h3>
+    <ul style="margin:6px 0 0">
+      <li><b>我只查了元数据，没有读它们的源码。</b>星数和描述说明"外面看起来是什么"，不等于"质量真的好用"。要判断某个项目能不能直接抄，得挑一个把 README 和关键实现读一遍。</li>
+      <li><b>星数会被时间放大。</b>93k★ 的 OpenCut 和 129k★ 的 MoneyPrinterTurbo 都是"大众爆款"，不代表工程最扎实；反而 4.5k★ 的 pyJianYingDraft 这种"窄而深"的项目更可能真能用。</li>
+      <li><b>活跃度我只看最后提交时间</b>，没看 issue/PR 积压。标"停滞"的（如 autoEdit_2 两年未动）意思是"别指望它跟得上剪映版本"。</li>
+    </ul>
+  </div>
+
+  <h2><span class="n">4.3</span>下一步可以马上做的验证</h2>
+  <ul>
+    <li>挑 <code>pyJianYingDraft</code> 读一遍草稿格式 → 确定 B 阶段可行性（半天内能给出结论）。</li>
+    <li>挑 <code>ArcReel</code> 读它的分镜数据结构 → 决定 Skein 分镜表字段怎么定。</li>
+    <li>看 <code>video-recap-skills</code> 的"导出剪映草稿"实现 → 验证「分镜表 → 草稿」这条链真的通。</li>
+  </ul>
+  <p class="note">如果这三条里有你想先确认的，说一声，我去把那个仓库读透再给你结论（而不是停在星数上）。</p>
+</section>
+
+<footer>
+  Skein 调研 · 数据抓取 2026-10-10 · 本文件为离线单页，无外部依赖<br>
+  星数为抓取当刻真值；项目质量与可用性未做源码级验证（见 04 节边界说明）
+</footer>
+</div>
+
+<script>
+(function(){
+  var tabs = document.querySelectorAll('nav.tabs button');
+  function show(id){
+    tabs.forEach(function(b){ b.setAttribute('aria-selected', String(b.dataset.t===id)); });
+    document.querySelectorAll('section').forEach(function(s){ s.hidden = (s.id!==id); });
+    window.scrollTo({top:0, behavior:'instant'});
+  }
+  tabs.forEach(function(b){ b.addEventListener('click', function(){ show(b.dataset.t); }); });
+  // 支持用 #p3 直接进某页
+  var h = (location.hash||'').replace('#','');
+  if (document.getElementById(h)) show(h);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>task-orb 排版参照 Demo v0.1（P0 工作台 · 4 套候选排版 · 就地讲解）</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2a2f3a;
+    --fg:#e8eaf0; --fg2:#9aa3b2; --fg3:#69707e;
+    --accent:#FFD01F; --accent-ink:#1a1a1a;
+    --ok:#4f9420; --warn:#E8A800; --danger:#FF6B6B; --blue:#5b9dff;
+  }
+  html[data-theme="light"]{
+    --bg:#f4f5f7; --panel:#ffffff; --panel2:#f0f1f4; --line:#e2e4ea;
+    --fg:#1c1c1e; --fg2:#5f6468; --fg3:#9599a1;
+    --accent:#E8A800; --ok:#4f9420; --warn:#C98A00; --danger:#d94a4a; --blue:#2b6fd6;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+       font:14px/1.65 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+       transition:background .2s,color .2s}
+  .wrap{max-width:1240px;margin:0 auto;padding:22px 20px 80px}
+  code,kbd,.mono{font-family:ui-monospace,Consolas,Menlo,monospace}
+
+  header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-bottom:16px;border-bottom:1px solid var(--line)}
+  header h1{font-size:18px;margin:0;letter-spacing:.4px}
+  header .sub{color:var(--fg3);font-size:12px}
+  .spacer{flex:1}
+  button{font-family:inherit}
+  button.tgl{background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:12px}
+  button.tgl:hover{border-color:var(--accent)}
+
+  nav{display:flex;gap:6px;margin:18px 0 16px;flex-wrap:wrap}
+  nav button{background:transparent;color:var(--fg2);border:1px solid var(--line);border-radius:999px;padding:7px 15px;cursor:pointer;font-size:13px}
+  nav button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+
+  .panel{display:none}.panel.on{display:block}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px}
+  .card h2{margin:0 0 4px;font-size:15px}
+  .card h3{margin:16px 0 8px;font-size:13px;color:var(--fg2)}
+  .card .note{color:var(--fg3);font-size:12px;margin-bottom:12px}
+  .lead{background:var(--panel2);border-left:3px solid var(--accent);border-radius:0 10px 10px 0;padding:13px 16px;font-size:14.5px;line-height:1.75}
+  .lead b{color:var(--accent)}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:6px 0}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:var(--panel2);color:var(--fg2);font-weight:600}
+  .k{color:var(--fg3);font-size:12px}
+  .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;border:1px solid var(--line);color:var(--fg2)}
+  .tag.ok{border-color:var(--ok);color:var(--ok)}
+  .tag.new{border-color:var(--danger);color:var(--danger)}
+  .tag.warn{border-color:var(--warn);color:var(--warn)}
+  .tag.blue{border-color:var(--blue);color:var(--blue)}
+  ul.tight,ol.tight{margin:8px 0;padding-left:20px}
+  ul.tight li,ol.tight li{margin:5px 0}
+
+  /* ======== mock app window（固定浅色，类"参考软件截图"） ======== */
+  .stage{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:14px}
+  .mock{background:#ffffff;color:#1c1c1e;border:1px solid #e2e4ea;border-radius:10px;overflow:hidden;box-shadow:0 8px 26px rgba(0,0,0,.28)}
+  .titlebar{display:flex;align-items:center;gap:8px;padding:9px 12px;background:#f6f7f9;border-bottom:1px solid #e6e8ec}
+  .dot{width:10px;height:10px;border-radius:50%;background:#d5d8de}
+  .titlebar .url{margin-left:8px;font-size:12px;color:#8a9099}
+  .titlebar .app{font-size:12.5px;font-weight:600;color:#3b4048}
+
+  .grid3{display:grid;grid-template-columns:190px 1fr 1.15fr;min-height:430px}
+  .grid2{display:grid;grid-template-columns:300px 1fr;min-height:380px}
+  .col{border-right:1px solid #e9ebef;padding:12px}
+  .col:last-child{border-right:0}
+  .colhead{font-size:11px;font-weight:700;letter-spacing:.4px;color:#9aa0a8;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+  .num{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:#FFD01F;color:#1a1a1a;font-size:11px;font-weight:800}
+
+  .rowitem{padding:8px 9px;border-radius:8px;font-size:13px;color:#3b4048;cursor:default}
+  .rowitem.on{background:#FFF7DC;border:1px solid #FFE38A}
+  .rowitem .m{display:block;font-size:11px;color:#9aa0a8}
+
+  .tsk{display:flex;gap:9px;padding:10px 8px;border-bottom:1px solid #eef0f3;font-size:13.5px;align-items:flex-start}
+  .tsk:last-child{border-bottom:0}
+  .box{width:17px;height:17px;border-radius:5px;border:1.6px solid #c9ced6;flex:0 0 auto;margin-top:2px;display:flex;align-items:center;justify-content:center}
+  .tsk.done .box{background:#FFD01F;border-color:#FFD01F}
+  .tsk.done .box svg{display:block}
+  .box svg{display:none}
+  .tsk .tx b{font-weight:600;color:#22262c}
+  .tsk .tx i{display:block;font-style:normal;font-size:11.5px;color:#9aa0a8;margin-top:1px}
+  .tsk.done .tx b{color:#8b9099;text-decoration:line-through}
+
+  .ev{background:#FBFBFD;border:1px solid #edeff3;border-radius:8px;padding:9px 11px;margin:8px 0 2px}
+  .ev .lbl{font-size:10.5px;font-weight:700;color:#b0b6be;letter-spacing:.4px}
+  .ev .txt{font-size:12.5px;color:#4a505a;margin-top:4px}
+  .chip{display:inline-block;font-size:10.5px;color:#6b727c;background:#eef1f5;border-radius:6px;padding:1px 7px;margin-top:6px}
+
+  .detailhead{font-size:14px;font-weight:700;color:#22262c}
+  .detailhead .sub{display:block;font-weight:400;font-size:11.5px;color:#9aa0a8;margin-top:3px}
+  .quoteblk{border-left:3px solid #FFD01F;background:#FFFDF4;border-radius:0 8px 8px 0;padding:9px 12px;margin:11px 0;font-size:13px;color:#3b4048}
+  .qa{border-left:3px solid #c9ced6;background:#fafbfc;border-radius:0 8px 8px 0;padding:8px 11px;margin:9px 0;font-size:12.5px;color:#6b727c}
+  .btn{display:inline-block;font-size:12.5px;padding:6px 12px;border-radius:8px;border:1px solid #e2e4ea;background:#fff;color:#3b4048;margin:4px 6px 0 0}
+  .btn.primary{background:#FFD01F;border-color:#FFD01F;color:#1a1a1a;font-weight:600}
+  .btn.disabled{opacity:.45}
+
+  .prog{display:flex;align-items:center;gap:8px;margin:6px 0 12px}
+  .bar{flex:1;height:7px;border-radius:999px;background:#eceef2;overflow:hidden}
+  .bar > i{display:block;height:100%;width:50%;background:#FFD01F}
+  .prog .pct{font-size:12px;font-weight:700;color:#3b4048;font-family:ui-monospace,Consolas,monospace}
+
+  /* Notion 式 */
+  .ntable{border:1px solid #e6e8ec;border-radius:8px;overflow:hidden;font-size:12.5px}
+  .ntable .tr{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;border-bottom:1px solid #eef0f3}
+  .ntable .tr:last-child{border-bottom:0}
+  .ntable .td{padding:8px 10px;border-right:1px solid #eef0f3;color:#3b4048}
+  .ntable .td:last-child{border-right:0}
+  .ntable .th{background:#f6f7f9;font-weight:700;color:#8a9099;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+  .blockh{font-size:15px;font-weight:800;color:#1c1c1e;margin:2px 0 8px}
+  .blk{padding:5px 0;font-size:13px;color:#3b4048;border-radius:6px}
+  .blk.todo{display:flex;gap:8px;align-items:flex-start}
+  .slash{display:inline-block;font-size:11.5px;color:#a6acb5;background:#f4f5f7;border:1px dashed #d9dde3;border-radius:6px;padding:2px 8px;margin-top:10px}
+
+  /* Todoist 式 */
+  .tdtask{display:flex;gap:9px;padding:9px 4px;font-size:13.5px;align-items:center}
+  .tdtask .box{border-radius:50%}
+  .mini{padding:14px;font-size:12.5px;color:#8a9099}
+
+  /* 讲解区 */
+  .teach{margin-top:4px}
+  .teach .row{display:flex;gap:10px;padding:9px 0;border-bottom:1px dashed var(--line)}
+  .teach .row:last-child{border-bottom:0}
+  .teach .n{flex:0 0 auto}
+  .teach .t{font-size:13px;color:var(--fg2)}
+  .teach .t b{color:var(--fg)}
+  .verdict{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+  .verdict .v{flex:1;min-width:210px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:11px 13px;font-size:12.5px;color:var(--fg2)}
+  .verdict .v b{display:block;color:var(--fg);font-size:13px;margin-bottom:4px}
+  footer{color:var(--fg3);font-size:12px;border-top:1px solid var(--line);margin-top:24px;padding-top:14px;line-height:1.8}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>task-orb 排版参照 Demo</h1>
+  <span class="sub">v0.1 ｜ 2026-10-09 ｜ P0 工作台基础排版 · 4 套候选 · 就地讲解</span>
+  <span class="spacer"></span>
+  <button class="tgl" id="themeBtn">切换明暗</button>
+</header>
+
+<nav id="nav">
+  <button class="on" data-p="p0">0 · 怎么选</button>
+  <button data-p="p1">A · TickTick 三栏</button>
+  <button data-p="p2">B · TickTick+Cubox（推荐）</button>
+  <button data-p="p3">C · Notion 式</button>
+  <button data-p="p4">D · Todoist 极简</button>
+</nav>
+
+<!-- ================= 0 怎么选 ================= -->
+<section class="panel on" id="p0">
+  <div class="card">
+    <h2>一句话结论</h2>
+    <div class="note">下面四套都拿同一份真实内容渲染：这一期 E005《MCP 到底创新在哪》+ 4 个素材项 + 进度 2/4。你直接比对哪套"一眼就会用"。</div>
+    <div class="lead">
+      <b>骨架抄滴答清单（TickTick）的三栏：期列表 → 素材清单 → 详情。素材卡样式补抄 Cubox（原文摘录 + 来源 + 时间）。</b>理由：P0 的屏就是"清单主线 + 每项背后挂一段素材原文"，TickTick 强在清单主线、弱在素材长什么样，Cubox 正好反过来，两者拼起来没有缺口。
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>四套候选横评</h2>
+    <table>
+      <thead><tr><th style="width:16%">候选</th><th style="width:26%">骨架</th><th style="width:30%">与 P0 的贴合</th><th>主要代价</th></tr></thead>
+      <tbody>
+        <tr><td><b>A · TickTick 三栏</b></td><td>清单分类 / 任务列表 / 任务详情</td><td><span class="tag ok">最贴合</span> 三栏一比一对应"哪一期 / 素材项 / 素材原文"</td><td>素材卡样式要自己补，详情区偏"任务"，不是"素材"</td></tr>
+        <tr><td><b>B · TickTick+Cubox</b></td><td>A 的骨架 + 素材卡样式来自 Cubox</td><td><span class="tag ok">最贴合</span> 骨架和素材表达都补齐</td><td>两套视觉要统一成一套 token，前期多花一点</td></tr>
+        <tr><td><b>C · Notion 式</b></td><td>数据库表视图 + 页面详情（block）</td><td><span class="tag warn">通用但偏重</span> 多期一览最好看，但还是"要主动打开"的气质</td><td>一旦做多视图/无限嵌套就膨胀，违背 P-007「轻」</td></tr>
+        <tr><td><b>D · Todoist 极简</b></td><td>两栏：清单 + 极简详情</td><td><span class="tag new">不够用</span> 没有素材原文/来源的落点</td><td>P1/P2 必然返工</td></tr>
+      </tbody>
+    </table>
+    <div class="k" style="margin-top:8px">判据：P0 的"素材原文 + 来源"必须能在同一屏里读到 —— 这一条直接淘汰 D，也让 C 显得多余。</div>
+  </div>
+
+  <div class="verdict">
+    <div class="v"><b>推荐：B（TickTick 骨架 + Cubox 素材卡）</b>骨架能装下清单，素材卡能装下原文/来源/时间，且两者都是"轻"的工具，和你否掉的方向不冲突。</div>
+    <div class="v"><b>退而求其次：A</b>如果嫌两套视觉要统一太麻烦，单用 TickTick 也能跑通，只是素材区会更像"任务备注"。</div>
+    <div class="v"><b>明确不推荐：C / D</b>C 会把你往"重"带，D 撑不到 P1。两者都留作参考，不作 P0 骨架。</div>
+  </div>
+
+  <div class="card">
+    <h2>看 demo 的姿势</h2>
+    <ul class="tight">
+      <li>每个 Tab 里是一套可比的 mock：<b>左边期列表、中间素材清单、右边详情</b>（C/D 栏位不同，会在讲解里说明）。</li>
+      <li>mock 上的 <span class="num">1</span> <span class="num">2</span> <span class="num">3</span> 数字标记＝栏位编号，下方"就地讲解"逐条解释<b>抄什么 / 不抄什么 / 风险</b>。</li>
+      <li>mock 是固定浅色（像参考软件的截图）；页面自身可切明暗，不影响判断栏位。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ================= A TickTick 三栏 ================= -->
+<section class="panel" id="p1">
+  <div class="card">
+    <h2>A · TickTick 三栏骨架</h2>
+    <div class="note">抄滴答清单桌面版的列表视图：<b>清单分类 / 任务列表 / 任务详情</b>三栏。<b>不跳页、点谁看谁</b>是它的关键手感。</div>
+  </div>
+
+  <div class="stage">
+    <div class="mock">
+      <div class="titlebar">
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        <span class="app">task-orb 工作台（mock）</span>
+        <span class="url">参照：滴答清单 / TickTick 桌面版 · 列表视图</span>
+      </div>
+      <div class="grid3">
+        <div class="col">
+          <div class="colhead"><span class="num">1</span>期列表</div>
+          <div class="rowitem on">E005 · MCP 创新在哪<span class="m">进行中 · 2/4</span></div>
+          <div class="rowitem">E004 · 游戏化编程网站<span class="m">进行中 · 6/6</span></div>
+          <div class="rowitem">E006 · AI 网关讲清楚<span class="m">未开始</span></div>
+          <div class="rowitem" style="color:#b6bbc3">已发布 / 弃稿（归档）</div>
+        </div>
+        <div class="col">
+          <div class="colhead"><span class="num">2</span>本期素材清单</div>
+          <div class="prog"><div class="bar"><i></i></div><span class="pct">2/4</span></div>
+          <div class="tsk done"><span class="box"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg></span><span class="tx"><b>一句话反常识结论</b><i>能让人站队的那种</i></span></div>
+          <div class="tsk done"><span class="box"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg></span><span class="tx"><b>一张对照表素材</b><i>它 vs 旧做法差在哪</i></span></div>
+          <div class="tsk"><span class="box"></span><span class="tx"><b>一个可核实的真实现象</b><i>谁在用 / 官方原文片段</i></span></div>
+          <div class="tsk"><span class="box"></span><span class="tx"><b>封面大字 + 奶蛙姿势</b><i>按 E0~E4 表情库挑一个</i></span></div>
+        </div>
+        <div class="col">
+          <div class="colhead"><span class="num">3</span>详情</div>
+          <div class="detailhead">一句话反常识结论<span class="sub">已勾选 · 素材 1 条 · 采集于 2026-10-09 10:12</span></div>
+          <div class="labelless k" style="margin-top:8px">素材原文</div>
+          <div class="quoteblk">它不是函数调用的替代品 —— 集成层的最小公约数。</div>
+          <div class="k">来源<a class="chip">example-article.local/mcp-what-is-actually-new</a></div>
+          <div class="qa">备注（TickTick 详情区原生支持）：封面大字候选「它不是替代品。」</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card teach">
+    <h2>就地讲解</h2>
+    <div class="row"><span class="n"><span class="num">1</span></span><span class="t"><b>抄：左栏只放"期"。</b>一期一行，行内带状态 + 进度（<span class="mono">2/4</span>）。这就是 P0 的 Topic 列表，栏位不用再发明。</span></div>
+    <div class="row"><span class="n"><span class="num">2</span></span><span class="t"><b>抄：中栏＝素材清单，复选框贴最左。</b>名称加粗、提示灰字小一号 —— 层级就够用了，别加优先级/日期/四象限这些通用任务字段。</span></div>
+    <div class="row"><span class="n"><span class="num">3</span></span><span class="t"><b>抄：右栏＝详情，且必须同屏。</b>TickTick 的"点一项就在右侧看详情、不跳页"正好接住 P0 的"勾一项 = 顺手喂一段素材"。</span></div>
+    <div class="row"><span class="n"><span class="num">!</span></span><span class="t"><b>不抄：</b>优先级、日期/重复、日历视图、四象限、番茄钟 —— 全是通用任务管理，与本项目无关，抄进来就是学习成本（P-007 反对的正是这个）。</span></div>
+    <div class="row"><span class="n"><span class="num">!</span></span><span class="t"><b>风险：</b>TickTick 的详情区本质是"任务备注"，宽度偏窄；而 P0 要在这里读"素材原文"，需要更宽的右栏。→ 所以右栏权重调大，或素材卡单独成块（见 B）。</span></div>
+    <div class="verdict">
+      <div class="v"><b>适合度：★★★★☆</b>骨架几乎零改动可用，只差"素材表达"这一块。</div>
+      <div class="v"><b>抄它的理由：</b>中文原生、Windows 有客户端、学习成本低，气质与「轻」同频。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= B TickTick + Cubox ================= -->
+<section class="panel" id="p2">
+  <div class="card">
+    <h2>B · TickTick 骨架 + Cubox 素材卡（推荐）</h2>
+    <div class="note">栏位沿用 A；把"素材"从一句备注升级成 Cubox 式的<b>摘录卡</b>：原文摘录 + 来源 chip + 采集时间。这是四套里唯一把"清单主线"和"素材表达"都补齐的。</div>
+  </div>
+
+  <div class="stage">
+    <div class="mock">
+      <div class="titlebar">
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        <span class="app">task-orb 工作台（mock）</span>
+        <span class="url">骨架：TickTick 三栏 ｜ 素材卡：Cubox 摘录样式</span>
+      </div>
+      <div class="grid3">
+        <div class="col">
+          <div class="colhead"><span class="num">1</span>期列表</div>
+          <div class="rowitem on">E005 · MCP 创新在哪<span class="m">进行中 · 2/4</span></div>
+          <div class="rowitem">E004 · 游戏化编程网站<span class="m">进行中 · 6/6</span></div>
+          <div class="rowitem">E006 · AI 网关讲清楚<span class="m">未开始</span></div>
+        </div>
+        <div class="col">
+          <div class="colhead"><span class="num">2</span>本期素材清单</div>
+          <div class="prog"><div class="bar"><i></i></div><span class="pct">2/4</span></div>
+          <div class="tsk done"><span class="box"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg></span><span class="tx"><b>一句话反常识结论</b><i>能让人站队的那种</i></span></div>
+          <div class="ev"><div class="lbl">素材 1 · 摘录</div><div class="txt">它不是函数调用的替代品 —— 集成层的最小公约数。</div><span class="chip">example-article.local/mcp-what-is-actually-new · 2026-10-09 10:12</span></div>
+          <div class="tsk done"><span class="box"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg></span><span class="tx"><b>一张对照表素材</b><i>它 vs 旧做法差在哪</i></span></div>
+          <div class="ev"><div class="lbl">素材 1 · 摘录</div><div class="txt">对照：发现能力 / 使用能力被标准化 vs 旧做法逐个重写。</div><span class="chip">example-article.local/mcp-what-is-actually-new · 2026-10-09 10:20</span></div>
+          <div class="tsk"><span class="box"></span><span class="tx"><b>一个可核实的真实现象</b><i>谁在用 / 官方原文片段</i></span></div>
+          <div class="tsk"><span class="box"></span><span class="tx"><b>封面大字 + 奶蛙姿势</b><i>按 E0~E4 表情库挑一个</i></span></div>
+        </div>
+        <div class="col">
+          <div class="colhead"><span class="num">3</span>详情 / 齐了 → 出草稿</div>
+          <div class="detailhead">E005 · MCP 到底创新在哪<span class="sub">抖音图文 · 目标 7 张 · 素材齐了（4/4 时启用）</span></div>
+          <div class="qa" style="margin-top:10px">AI 草稿建议（奶蛙语气 · 由已锁人设卡生成，非真实模型输出）<br>今天奶蛙给你讲清楚 MCP。封面大字「它不是函数调用的替代品。」第 2 张卡痛点：你已经能接数据库了，为什么还要套一层？</div>
+          <div class="btn primary disabled">素材齐了，去准备发布</div>
+          <div style="margin-top:6px">
+            <span class="btn">抖音创作发布</span><span class="btn">B站投稿</span><span class="btn">小红书发布</span>
+          </div>
+          <div class="k" style="margin-top:8px">底层＝<span class="mono">computer.open_url</span>；发送永远真人。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card teach">
+    <h2>就地讲解</h2>
+    <div class="row"><span class="n"><span class="num">1</span></span><span class="t"><b>抄（TickTick）：</b>三栏骨架、点谁看谁、进度条 + <span class="mono">2/4</span> 的手感 —— 一个字不改。</span></div>
+    <div class="row"><span class="n"><span class="num">2</span></span><span class="t"><b>抄（Cubox）：</b>素材卡＝<b>摘录块</b> + <b>来源 chip</b> + <b>采集时间</b>。Cubox 的核心美感就是"原文是可回源的、带时间戳的一段"，这正是 P0「没有原文的打勾等于没打」的直观呈现。</span></div>
+    <div class="row"><span class="n"><span class="num">3</span></span><span class="t"><b>抄（TickTick 的详情位置）：</b>把"草稿建议 + 跳发布页"放右栏底部。清单齐了这里才点亮 —— 与你 demo v0.4 里球面板的逻辑一致，将来球接进来只是换了个订阅者。</span></div>
+    <div class="row"><span class="n"><span class="num">!</span></span><span class="t"><b>不抄（Cubox）：</b>它的"收藏流 / 标签树 / 稍后读"——那是素材为主的形态，本项目是清单为主，别把方向做反。</span></div>
+    <div class="row"><span class="n"><span class="num">!</span></span><span class="t"><b>风险：</b>两套参照的圆角/间距/字号要收敛成一套 token，否则会"像两个软件拼在一起"。收敛规则：<b>栏位间距跟 TickTick、卡片样式跟 Cubox、强调色用奶蛙黄 #FFD01F</b>。</span></div>
+    <div class="verdict">
+      <div class="v"><b>适合度：★★★★★</b>清单主线与素材表达都补齐，且都属"轻"的工具。</div>
+      <div class="v"><b>代价：</b>前期要把两套视觉统一成一套 token，一次性成本。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= C Notion 式 ================= -->
+<section class="panel" id="p3">
+  <div class="card">
+    <h2>C · Notion 式（数据库 + 页面）</h2>
+    <div class="note">上层是<b>多期一览的数据库表</b>，点进去是<b>页面 block</b>（清单/正文混排）。它最擅长"多期一览"，但气质偏重。</div>
+  </div>
+
+  <div class="stage">
+    <div class="mock">
+      <div class="titlebar">
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        <span class="app">task-orb 工作台（mock）</span>
+        <span class="url">参照：Notion · 数据库 + 页面（自媒体选题/素材模板）</span>
+      </div>
+      <div style="padding:14px">
+        <div class="colhead"><span class="num">1</span>数据库视图 · 全部期（Table）</div>
+        <div class="ntable">
+          <div class="tr"><div class="td th">主题</div><div class="td th">平台</div><div class="td th">状态</div><div class="td th">进度</div></div>
+          <div class="tr"><div class="td"><b>E005 · MCP 创新在哪</b></div><div class="td">抖音图文</div><div class="td">进行中</div><div class="td">2/4</div></div>
+          <div class="tr"><div class="td">E004 · 游戏化编程网站</div><div class="td">抖音图文</div><div class="td">进行中</div><div class="td">4/4</div></div>
+          <div class="tr"><div class="td">E006 · AI 网关讲清楚</div><div class="td">抖音图文</div><div class="td">未开始</div><div class="td">0/5</div></div>
+        </div>
+        <div style="border-top:1px solid #eef0f3;margin:16px 0 12px"></div>
+        <div class="colhead"><span class="num">2</span>页面 · E005（block 混排）</div>
+        <div class="blockh">E005 · MCP 到底创新在哪</div>
+        <div class="blk">本期目标：抖音图文 7 张 · 目标平台：抖音</div>
+        <div class="blk todo"><span class="box" style="background:#FFD01F;border-color:#FFD01F"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg></span>一句话反常识结论</div>
+        <div class="blk todo"><span class="box" style="background:#FFD01F;border-color:#FFD01F"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg></span>一张对照表素材</div>
+        <div class="quoteblk">它不是函数调用的替代品 —— 集成层的最小公约数。
+          <div><span class="chip">来源：example-article.local/mcp · 2026-10-09 10:12</span></div>
+        </div>
+        <div class="blk todo"><span class="box"></span>一个可核实的真实现象</div>
+        <div class="slash">/ 输入以添加 block（标题、列表、附件、子任务…）</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card teach">
+    <h2>就地讲解</h2>
+    <div class="row"><span class="n"><span class="num">1</span></span><span class="t"><b>值得抄的只有一处：</b>数据库表视图。当你有 24 期排期时，"多期一览 + 状态/进度"这一屏确实比纯列表清楚 —— 这一块可以在 P1 之后补进来。</span></div>
+    <div class="row"><span class="n"><span class="num">2</span></span><span class="t"><b>block 混排：</b>清单项与素材混在一起，好看，但"哪几项没做完"不如 A/B 的复选框列表一眼看清 —— <b>P0 主线是"还差哪几项"，视觉上不该被素材块稀释。</b></span></div>
+    <div class="row"><span class="n"><span class="num">!</span></span><span class="t"><b>不抄：</b>无限嵌套、slash 命令、多视图（表/看板/画廊）切换、属性面板 —— 每一样都是学习成本，正是 P-007 那句"一看就觉得有学习成本"的成因。</span></div>
+    <div class="row"><span class="n"><span class="num">!</span></span><span class="t"><b>风险：</b>Notion 的吸引力在"什么都能做"，而本项目要的是"只能做这一件事"。抄它很容易把 P0 做成一个半成品 Notion → 白写率飙升。</span></div>
+    <div class="verdict">
+      <div class="v"><b>适合度：★★★☆☆</b>只借"数据库表视图"用于多期一览，不作 P0 主骨架。</div>
+      <div class="v"><b>结论：</b>留作 P1+ 的"期总览"参考，不进 P0。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= D Todoist ================= -->
+<section class="panel" id="p4">
+  <div class="card">
+    <h2>D · Todoist 极简两栏</h2>
+    <div class="note">只留"清单 + 极简详情"。低于需要的复杂度 —— 这一套主要用来<b>反向确认"素材原文该有落点"</b>。</div>
+  </div>
+
+  <div class="stage">
+    <div class="mock">
+      <div class="titlebar">
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        <span class="app">task-orb 工作台（mock）</span>
+        <span class="url">参照：Todoist · 极简清单</span>
+      </div>
+      <div class="grid2">
+        <div class="col">
+          <div class="colhead"><span class="num">1</span>素材清单</div>
+          <div class="tdtask"><span class="box" style="background:#FFD01F;border-color:#FFD01F"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg></span>一句话反常识结论</div>
+          <div class="tdtask"><span class="box" style="background:#FFD01F;border-color:#FFD01F"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg></span>一张对照表素材</div>
+          <div class="tdtask"><span class="box"></span>一个可核实的真实现象</div>
+          <div class="tdtask"><span class="box"></span>封面大字 + 奶蛙姿势</div>
+        </div>
+        <div class="col">
+          <div class="colhead"><span class="num">2</span>详情</div>
+          <div class="mini">
+            <div class="detailhead">一句话反常识结论</div>
+            <div class="k" style="margin-top:6px">备注：封面大字候选「它不是替代品。」</div>
+            <div class="qa" style="margin-top:10px">素材原文无处安放 —— 只能塞进"备注"里当纯文本，来源和采集时间没有位置。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card teach">
+    <h2>就地讲解</h2>
+    <div class="row"><span class="n"><span class="num">1</span></span><span class="t"><b>值得抄的：</b>行高、字号层级、勾选动效的克制感 —— 这套"留白与安静"可以作为 A/B 的基线。</span></div>
+    <div class="row"><span class="n"><span class="num">2</span></span><span class="t"><b>致命缺口：</b>它没有"素材原文 + 来源 + 时间"的结构位置。<b>而 requirements §2.5 已把"素材原文必填"定为唯一会影响表结构的硬约束</b> —— Todoist 骨架撑不住这条。</span></div>
+    <div class="row"><span class="n"><span class="num">!</span></span><span class="t"><b>结论：</b>不作骨架。它的价值是当"最小可视复杂度"的下界参照 —— 你的界面不该比它更热闹。</span></div>
+    <div class="verdict">
+      <div class="v"><b>适合度：★★☆☆☆</b>风格可借，结构不可借。</div>
+      <div class="v"><b>用途：</b>反向标杆 —— 界面"热闹度"不得低于它、也不该远超它。</div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  task-orb 排版参照 Demo v0.1 ｜ 2026-10-09 ｜ 对象：<code>Desktop\task-orb\docs\requirements.md</code> v0.3.0、<code>Desktop\task-orb\task-orb-调研验证-demo.html</code> v0.4.0 ｜
+  参照来源：滴答清单/TickTick 桌面版列表视图、Cubox 摘录卡、Notion 自媒体创作模板、Todoist 极简清单 ｜
+  本页 mock 均为演示用样张，非参考软件真机截图，内容为 task-orb 演示数据。单文件零依赖、无外链、无 emoji、可断网打开。
+</footer>
+
+</div>
+<script>
+(function(){
+  "use strict";
+  var themeBtn=document.getElementById('themeBtn');
+  themeBtn.addEventListener('click',function(){
+    var cur=document.documentElement.getAttribute('data-theme');
+    document.documentElement.setAttribute('data-theme',cur==='dark'?'light':'dark');
+  });
+  var nav=document.getElementById('nav');
+  nav.addEventListener('click',function(e){
+    var b=e.target.closest('button'); if(!b) return;
+    [].forEach.call(nav.children,function(x){x.classList.remove('on');});
+    b.classList.add('on');
+    [].forEach.call(document.querySelectorAll('.panel'),function(p){p.classList.remove('on');});
+    document.getElementById(b.dataset.p).classList.add('on');
+    window.scrollTo({top:0,behavior:'smooth'});
+  });
+})();
+</script>
+</body>
+</html>

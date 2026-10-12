@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Skein · 池子 · 天蓝双层 · 液体仿真</title>
+<style>
+/* ============================================================
+   池子 v2 · 定稿方向
+   - 01 的自由漂浮：球随便漂，顺序只写在球上的编号里
+   - 双层：段球（大、带编号）+ 素材球（小、绕着段球转）
+   - 天蓝、清透、有分层；深一点的水里球更暗更蓝 —— 深度自己会说话
+   - 未定顺序的段球混在同一口池里漂，只是暗一档 + 一颗「未定」小字
+   规矩：金只给编号/选中/统计；水一律冷色；颜色不区分素材类型。
+   ============================================================ */
+:root{
+  --bg:#0a0a0f; --surf:#141313; --hair:#2a2724; --hair2:#3d3833;
+  --fg:#f2ece1; --fg2:#b3a894; --fg3:#7c7365;
+  --gold:#FFD01F;
+  --deep1:#071019; --deep2:#0d2438; --deep3:#14405f;
+  --sky1:#eaf7ff; --sky2:#a9defa; --sky3:#5fb6e8; --sky4:#2f7fb8; --sky5:#17527f;
+  --dull1:#9fb6c4; --dull2:#5d7c90; --dull3:#2c4455;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);
+  font-family:"Microsoft YaHei UI","Segoe UI",system-ui,sans-serif;font-size:14px;line-height:1.6}
+.wrap{max-width:1180px;margin:0 auto;padding:0 24px 80px}
+header{padding:34px 0 16px;border-bottom:1px solid var(--hair)}
+.kicker{font-family:Consolas,monospace;font-size:11px;letter-spacing:2.2px;color:var(--fg3)}
+h1{margin:10px 0 8px;font-size:23px;font-weight:700}
+h1 em{font-style:normal;color:var(--gold)}
+.lede{color:var(--fg2);max-width:900px;font-size:14px}
+.quote{margin:14px 0 0;padding:10px 14px;border-left:2px solid var(--gold);
+  background:#16150f;color:var(--fg2);font-size:13px;border-radius:0 8px 8px 0}
+nav.tabs{display:flex;gap:2px;margin:22px 0 0;border-bottom:1px solid var(--hair);flex-wrap:wrap}
+nav.tabs button{appearance:none;background:none;border:none;border-bottom:2px solid transparent;
+  color:var(--fg3);font-family:inherit;font-size:13.5px;padding:10px 15px 11px;cursor:pointer}
+nav.tabs button:hover{color:var(--fg2)}
+nav.tabs button[aria-selected="true"]{color:var(--gold);border-bottom-color:var(--gold);font-weight:600}
+section[hidden]{display:none}
+section{padding-top:24px}
+.sub{color:var(--fg3);font-size:12.5px;margin:0 0 14px;max-width:940px}
+.row{display:grid;grid-template-columns:1fr 296px;gap:18px;align-items:start}
+@media (max-width:920px){.row{grid-template-columns:1fr}}
+
+/* ---------------- 池子本体 ---------------- */
+.basin{
+  position:relative;height:560px;border-radius:20px;overflow:hidden;
+  background:linear-gradient(180deg,#0a1520 0%,#08121c 46%,#04080d 100%);
+  border:1px solid #24455c;
+  box-shadow:inset 0 2px 0 rgba(180,230,255,.12), inset 0 0 0 1px rgba(255,255,255,.04),
+             0 24px 60px rgba(0,0,0,.6);
+  cursor:crosshair;
+}
+.cv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.cv-back{z-index:0}
+.layer{position:absolute;inset:0;z-index:1;pointer-events:none}
+.cv-front{z-index:2}
+.hint{position:absolute;left:0;right:0;top:46%;text-align:center;
+  color:rgba(180,220,245,.30);font-size:12.5px;pointer-events:none;z-index:3}
+
+/* ---------------- 球 ---------------- */
+.ball{
+  position:absolute;left:0;top:0;border-radius:50%;cursor:grab;user-select:none;
+  pointer-events:auto;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(circle at 30% 24%,
+      var(--sky1) 0%, var(--sky2) 11%, var(--sky3) 40%, var(--sky4) 71%, var(--sky5) 100%);
+  box-shadow:
+    inset 0 2px 3px rgba(255,255,255,.8),
+    inset -5px -7px 16px rgba(8,44,74,.55),
+    inset 5px 6px 14px rgba(206,240,255,.30),
+    0 12px 26px rgba(0,18,34,.5),
+    0 2px 6px rgba(0,0,0,.4);
+  transition:box-shadow .12s linear;
+}
+.ball:before{ /* 镜面高光 */
+  content:"";position:absolute;left:15%;top:10%;width:37%;height:25%;border-radius:50%;
+  background:radial-gradient(ellipse at 42% 40%, rgba(255,255,255,.96), rgba(255,255,255,0) 74%);
+  transform:rotate(-16deg);pointer-events:none
+}
+.ball:after{ /* 底部的内反射亮斑：玻璃透光的证据 */
+  content:"";position:absolute;left:24%;bottom:8%;width:52%;height:24%;border-radius:50%;
+  background:radial-gradient(ellipse at center, rgba(186,232,255,.55), rgba(186,232,255,0) 72%);
+  pointer-events:none
+}
+.ball .num{
+  position:relative;z-index:3;font-family:Consolas,"Cascadia Mono",monospace;font-weight:700;
+  color:#0d1b26;text-shadow:0 1px 0 rgba(255,255,255,.55), 0 0 10px rgba(255,208,31,.35);
+  -webkit-text-stroke:1px rgba(255,208,31,.9);letter-spacing:-.5px
+}
+.ball.plain{
+  background:radial-gradient(circle at 30% 24%,
+      var(--dull1) 0%, var(--dull2) 42%, var(--dull3) 100%);
+  box-shadow:inset 0 2px 3px rgba(255,255,255,.35),
+             inset -5px -7px 16px rgba(0,14,24,.6),
+             0 10px 22px rgba(0,14,26,.45);
+  filter:saturate(.38) brightness(.74)
+}
+.ball.sel{box-shadow:0 0 0 3px var(--gold), 0 0 26px rgba(255,208,31,.42),
+            0 12px 26px rgba(0,18,34,.5)}
+.ball.drag{cursor:grabbing;z-index:20}
+.ball .tag{
+  position:absolute;left:50%;transform:translateX(-50%);bottom:-17px;white-space:nowrap;
+  font-family:Consolas,monospace;font-size:10.5px;letter-spacing:.6px;
+  color:rgba(214,232,244,.62);pointer-events:none;z-index:3
+}
+/* 素材球：绕着段球转的小球 */
+.mat{
+  position:absolute;left:50%;top:50%;border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle at 32% 26%, #f2fbff 0%, #b6e3fa 22%, #62b9e8 55%, #2c7cb1 100%);
+  box-shadow:inset 0 1px 2px rgba(255,255,255,.9),
+             inset 0 -3px 6px rgba(8,44,74,.55),
+             0 3px 9px rgba(0,18,34,.4)
+}
+.mat:after{content:"";position:absolute;left:22%;top:18%;width:34%;height:26%;border-radius:50%;
+  background:radial-gradient(ellipse at center, rgba(255,255,255,.95), rgba(255,255,255,0) 72%)}
+
+/* ---------------- 右侧操作台 ---------------- */
+.panel{background:var(--surf);border:1px solid var(--hair);border-radius:12px;padding:14px}
+.panel h3{margin:0 0 8px;font-size:13px;font-weight:600}
+.panel .k{font-family:Consolas,monospace;font-size:10.5px;letter-spacing:1.2px;color:var(--fg3);
+  text-transform:uppercase;margin:14px 0 6px}
+.panel .k:first-child{margin-top:0}
+.meta{font-family:Consolas,monospace;font-size:11px;color:var(--fg3);margin:2px 0 8px;line-height:1.75}
+.meta b{color:var(--fg2);font-weight:600}
+.btn{appearance:none;font-family:inherit;font-size:12px;color:var(--fg);cursor:pointer;
+  background:#1d1915;border:1px solid var(--hair);border-radius:8px;padding:7px 10px;width:100%;margin-bottom:6px}
+.btn:hover{background:#252019;border-color:var(--hair2)}
+.btn.gold{background:var(--gold);border-color:#FFDE63;color:#1a160d;font-weight:700}
+.btn.gold:hover{background:#FFDE63}
+.btn.ghost{background:transparent;border-color:#6b5a1c;color:var(--gold);font-weight:600}
+.btn.ghost:hover{border-color:var(--gold)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.half{width:calc(50% - 3px);display:inline-block}
+.btn.half + .btn.half{margin-left:6px}
+.field{width:100%;background:#141210;border:1px solid var(--hair);border-radius:8px;
+  color:var(--fg);font-family:inherit;font-size:12.5px;padding:7px 9px;margin-bottom:8px}
+.field:focus{outline:none;border-color:var(--gold)}
+.info{background:#111820;border:1px solid #24455c;border-radius:8px;padding:8px 10px;
+  font-size:12.5px;color:var(--fg2);margin-bottom:8px;min-height:38px}
+.info b{color:var(--sky2);font-weight:600}
+.info .non{color:var(--fg3)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-family:Consolas,monospace;font-size:10.5px;
+  color:var(--fg3);margin:8px 0 0}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle;font-style:normal}
+.notes{margin:14px 0 0;padding-left:20px;color:var(--fg2);font-size:12.5px}
+.notes li{margin:5px 0}
+footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--hair);
+  font-family:Consolas,monospace;font-size:11px;color:var(--fg3)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">SKEIN · 池子 · 定稿方向 v2</div>
+  <h1>一口空旷水池，<em>段落是漂在里面的球</em></h1>
+  <p class="lede">
+    按你选的走：顺序只写在球上的编号里，位置怎么摆都不影响先后；球做成<b>清透天蓝</b>、看得见分层；
+    池子是<b>真的液体</b>——有波面、有水下的光斑、有涟漪。<br>
+    <b>球放定就不动，只有你拖它才动；动的是水。</b><br>
+    两层：<b>大球＝视频的一个段落</b>（带编号），<b>挂在它周围的小球＝这一段的素材</b>。
+    没编号的段球混在同一口池里，只是暗一档、底下挂一颗「未定」。
+  </p>
+  <div class="quote">“放一个空旷的水池，然后每一个叙事或者说视频的段落都是一个漂浮的球，但是这个球是有编号的，这个编号也就意味着视频段落的先后顺序，然后有一些没有被标记的球就没有编号，然后用户可以去对池中的球增删改查。”</div>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button role="tab" aria-selected="true"  data-t="s1">A · 缓波静池</button>
+  <button role="tab" aria-selected="false" data-t="s2">B · 镜面薄水</button>
+  <button role="tab" aria-selected="false" data-t="s3">C · 涌泉活水</button>
+</nav>
+
+<section id="s1">
+  <p class="sub">波面由三组不同波长的正弦叠加而成（不是一条上下平移的直线）；水下有缓慢游动的光斑与淡淡的层线；点水面、拖球、加素材都会荡出一圈涟漪。水越深越蓝，球沉得越深就越暗——<b>分层是水自己给的</b>，不用另加特效。<b>球是钉在水里的：摆在哪就一直在哪，只有你拖它才动。</b></p>
+  <div class="row"><div class="basin" id="bA"></div><div class="panel" id="pA"></div></div>
+  <ul class="notes">
+    <li>拖<b>大球</b>＝挪位置，往下拖＝沉得更深（顺序不看位置、也不看深浅，只看编号，所以怎么拖都不会乱）。</li>
+    <li>大球大小 = 这一段手上素材多少；点「给它加一颗素材」，挂在它周围的小球多一颗。</li>
+    <li>点空白水面 = 荡一圈涟漪；双击空白 = 投一颗没编号的新球。</li>
+  </ul>
+</section>
+
+<section id="s2" hidden>
+  <p class="sub">水极浅、极静，近乎一面镜子：波面只留一条几乎直的亮线，水面下方是大面积的镜面反射带。适合「我要看清池子里到底有什么」——代价是活泼感弱一些，球多时略显平。</p>
+  <div class="row"><div class="basin" id="bB"></div><div class="panel" id="pB"></div></div>
+  <ul class="notes">
+    <li>球同样一动不动，三种水感的区别只在<b>水怎么动</b>。</li>
+    <li>这一版重点在「透」：水下几乎能看清每一颗球，涟漪更细、扩散更慢，像静水被轻轻点了一下。</li>
+  </ul>
+</section>
+
+<section id="s3" hidden>
+  <p class="sub">水深、浪碎、有气泡从底下升上来。水动得最凶，氛围最足；但球依旧不动，所以球边上的水面会明显上下扫过——如果嫌吵或嫌波线扫到球，A 版是中间值。</p>
+  <div class="row"><div class="basin" id="bC"></div><div class="panel" id="pC"></div></div>
+  <ul class="notes">
+    <li>气泡纯装饰，不代表任何数据；不想要可以去掉。</li>
+    <li>波幅大，水面的亮线会从球的上下缘扫过去；球本身始终待在原处。</li>
+  </ul>
+</section>
+
+<footer>SKEIN · 池子语义草案 · 与真实界面尚未联动，等你点头再落到 PyQt 面板里</footer>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+/* ================= 三种水 ================= */
+var WATER = {
+  A:{ name:'缓波静池',
+      amp:[7.5,3.4,1.7], k:[0.0076,0.0164,0.0330], sp:[0.40,-0.68,1.10],
+      film:[0.09,0.32], caustic:0.55, causticN:5, bubble:0, bob:1.0, rip:1.0 },
+  B:{ name:'镜面薄水',
+      amp:[2.4,1.3,0.6], k:[0.0050,0.0110,0.0240], sp:[0.20,-0.34,0.58],
+      film:[0.15,0.46], caustic:0.22, causticN:3, bubble:0, bob:0.35, rip:0.55 },
+  C:{ name:'涌泉活水',
+      amp:[9.5,5.2,2.6], k:[0.0092,0.0210,0.0410], sp:[0.70,-1.12,1.85],
+      film:[0.11,0.38], caustic:0.95, causticN:7, bubble:26, bob:1.9, rip:1.5 }
+};
+
+var R_BASE = 28;              // 段球最小半径：别做小了，编号要看得清
+var R_PER_MAT = 2.6;          // 每颗素材给段球加一点体积
+var MAT_R = [5.5, 6.5, 7.5, 8.5];   // 素材球半径档位
+
+function radiusFor(it){ return R_BASE + Math.min(it.mats, 6) * R_PER_MAT; }
+function matRadius(i){ return MAT_R[i % MAT_R.length]; }
+
+/* 波面高度：三组正弦叠加 */
+function waveAt(x, t, S){
+  return S.amp[0]*Math.sin(S.k[0]*x + t*S.sp[0])
+       + S.amp[1]*Math.sin(S.k[1]*x + t*S.sp[1])
+       + S.amp[2]*Math.sin(S.k[2]*x + t*S.sp[2]);
+}
+
+/* ================= 引擎 ================= */
+function makePool(basinId, panelId, key){
+  var S = WATER[key];
+  var basin = document.getElementById(basinId);
+  var panel = document.getElementById(panelId);
+  if (!basin || !panel) return null;
+
+  var back = document.createElement('canvas'); back.className = 'cv cv-back';
+  var front = document.createElement('canvas'); front.className = 'cv cv-front';
+  var layer = document.createElement('div'); layer.className = 'layer';
+  basin.appendChild(back); basin.appendChild(layer); basin.appendChild(front);
+  var bx = back.getContext('2d'), fx = front.getContext('2d');
+
+  var hint = document.createElement('div'); hint.className = 'hint';
+  hint.textContent = '球放定就不动 · 点水面荡涟漪 · 双击投一颗新球';
+  basin.appendChild(hint);
+
+  var W = 0, H = 0, dpr = 1;
+  var items = [];              // 段球
+  var nodes = {};              // id -> {el, num, tag, mats:[el]}
+  var sel = null, cur = null;
+  var drag = null;             // {it, dx, dy, moved}
+  var ripples = [], bubbles = [];
+  var seed = 0;
+
+  /* ---------- 建球 ---------- */
+  function mkItem(n, mats){
+    seed++;
+    var it = { id:seed, n:n, label:'', mats:mats, x:0, y:0,
+               depth:0.12 + Math.random()*0.6, placed:false };
+    items.push(it);
+    var el = document.createElement('div');
+    el.className = 'ball' + (n == null ? ' plain' : '');
+    el.dataset.id = String(it.id);
+    el.tabIndex = 0;
+    var num = document.createElement('div'); num.className = 'num';
+    var tag = document.createElement('div'); tag.className = 'tag'; tag.textContent = '未定';
+    el.appendChild(num); el.appendChild(tag);
+    layer.appendChild(el);
+    nodes[it.id] = { el:el, num:num, tag:tag, mats:[] };
+    buildMats(it);
+    bindBall(el, it);
+    return it;
+  }
+  function buildMats(it){
+    var nd = nodes[it.id]; if (!nd) return;
+    for (var i=0;i<nd.mats.length;i++) nd.mats[i].remove();
+    nd.mats = [];
+    for (var j=0;j<it.mats;j++){
+      var m = document.createElement('div');
+      m.className = 'mat';
+      var r = matRadius(j);
+      m.style.width = (r*2)+'px'; m.style.height = (r*2)+'px';
+      m._r = r;
+      /* 素材球静止：均匀分布在一圈上，不自己转 —— 只有你动它才动 */
+      m._a = (j / Math.max(it.mats,1)) * 6.283 + 0.5;
+      nd.el.appendChild(m); nd.mats.push(m);
+    }
+  }
+
+  /* ---------- 选中 / 交互 ---------- */
+  function select(id){ sel = id; sync(); refreshEdit(); }
+  function bindBall(el, it){
+    el.addEventListener('mousedown', function(e){
+      var b = el.getBoundingClientRect();
+      /* 用 rect 的宽高取球心：球按深度缩放过，不能拿逻辑半径当屏幕半径 */
+      drag = { it:it, el:el, dx:e.clientX - (b.left + b.width/2),
+               dy:e.clientY - (b.top + b.height/2), moved:false };
+      el.classList.add('drag'); el.focus(); select(it.id);
+      e.preventDefault(); e.stopPropagation();
+    });
+    el.addEventListener('keydown', function(e){
+      if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); select(it.id); }
+    });
+  }
+  document.addEventListener('mousemove', function(e){
+    if (!drag) return;
+    var b = basin.getBoundingClientRect();
+    var r = radiusFor(drag.it);
+    var nx = e.clientX - b.left - drag.dx;
+    drag.it.x = Math.max(r + 8, Math.min(W - r - 8, nx));
+    /* 纵向 = 深度：越往下越深 */
+    var yy = e.clientY - b.top - drag.dy - topY();
+    drag.it.depth = Math.max(0, Math.min(1, yy / spanY()));
+    drag.moved = true;
+  });
+  document.addEventListener('mouseup', function(){
+    if (!drag) return;
+    drag.el.classList.remove('drag');
+    if (!drag.moved) { drag = null; return; }
+    ripple(drag.it.x, yOf(drag.it), 1);
+    drag = null;
+  });
+
+  basin.addEventListener('mousedown', function(e){
+    if (e.target !== basin) return;
+    ripple(e.clientX - basin.getBoundingClientRect().left,
+           e.clientY - basin.getBoundingClientRect().top, 1);
+  });
+  basin.addEventListener('dblclick', function(e){
+    if (e.target !== basin) return;
+    addPlain();
+  });
+
+  function ripple(x, y, k){
+    ripples.push({ x:x, y:y, r0:6, age:0, life:(1.5 + Math.random()*0.5)/S.rip, sp:60*S.rip, k:(k||1) });
+    if (ripples.length > 24) ripples.shift();
+  }
+
+  /* ---------- 位置 ---------- */
+  /* 球放定之后就不动了：位置只有一个来源 —— 用户拖动。
+     所以这里没有速度、没有呼吸、没有随波起伏；波只属于水面。 */
+  var TOP_GAP = 26, BOT_GAP = 84;
+  function surfY(x, t){ return H * 0.155 + waveAt(x, t, S) * S.bob; }
+  function topY(){ return H * 0.155 + TOP_GAP; }
+  function spanY(){ return Math.max(40, H - topY() - BOT_GAP); }
+  function yOf(it){ return topY() + it.depth * spanY(); }
+
+  /* ---------- 增删改查 ---------- */
+  function addPlain(label){
+    var it = mkItem(null, 0);
+    it.label = label || '（还没定顺序）新的一段';
+    place(it);
+    ripple(it.x, yOf(it), 1.4);
+    sync();
+    return it.id;
+  }
+  /* 找一条最空的横向落点：球之间不叠；落定后不再自动挪 */
+  function freeX(r){
+    var lo = r + 18, hi = Math.max(lo, W - r - 18), best = lo, bestGap = -1e9;
+    for (var k=0;k<24;k++){
+      var x = lo + (hi - lo) * (k/23);
+      var gap = 1e9, c = 0;
+      for (var i=0;i<items.length;i++){
+        if (!items[i].placed) continue;
+        var d = Math.abs(items[i].x - x) - radiusFor(items[i]);
+        if (d < gap) gap = d;
+        c++;
+      }
+      if (!c) return x;
+      if (gap > bestGap){ bestGap = gap; best = x; }
+    }
+    return best;
+  }
+  function place(it){
+    it.x = freeX(radiusFor(it));
+    it.placed = true;
+  }
+  function promote(id){
+    var it = byId(id); if (!it) return;
+    it.n = ordered().length + 1;
+    it.label = (it.label || '').replace(/^（还没定顺序）/, '');
+    sync();
+  }
+  function setNum(id, v){
+    var it = byId(id); if (!it) return;
+    if (v == null || v === ''){
+      it.n = null;
+      ordered().forEach(function(o, i){ o.n = i + 1; });   /* 抽掉一颗，后面的编号顺延收拢 */
+    } else {
+      var ord = ordered().filter(function(o){ return o.id !== id; });
+      var want = Math.max(1, Math.min(ord.length + 1, parseInt(v, 10) || 1));
+      it.n = want + 0.5;            /* 先插进去，再整体重排 */
+      ord.splice(want - 1, 0, it);
+      ord.forEach(function(o, i){ o.n = i + 1; });
+    }
+    sync();
+  }
+  function setLabel(id, txt){
+    var it = byId(id); if (it){ it.label = txt; sync(); }
+  }
+  function addMat(id){
+    var it = byId(id); if (!it) return;
+    it.mats++; buildMats(it); sync(); ripple(it.x, yOf(it), 0.8);
+  }
+  function remove(id){
+    var it = byId(id); if (!it) return;
+    var nd = nodes[id];
+    if (nd){ nd.el.remove(); delete nodes[id]; }
+    items = items.filter(function(i){ return i.id !== id; });
+    ordered().forEach(function(o, i){ o.n = i + 1; });
+    if (sel === id){ sel = null; cur = null; }
+    sync();
+  }
+  function byId(id){ for (var i=0;i<items.length;i++) if (items[i].id === id) return items[i]; return null; }
+  function ordered(){
+    return items.filter(function(i){ return i.n != null; })
+                .sort(function(a,b){ return a.n - b.n; });
+  }
+
+  /* ---------- 同步 DOM ---------- */
+  function sync(){
+    for (var i=0;i<items.length;i++){
+      var it = items[i], nd = nodes[it.id]; if (!nd) continue;
+      var r = radiusFor(it);
+      nd.el.classList.toggle('plain', it.n == null);
+      nd.el.classList.toggle('sel', sel === it.id);
+      nd.el.style.width = (r*2)+'px';
+      nd.el.style.height = (r*2)+'px';
+      nd.num.textContent = it.n == null ? '' : String(it.n);
+      nd.num.style.fontSize = Math.round(r*0.78)+'px';
+      nd.tag.style.display = it.n == null ? '' : 'none';
+    }
+    meta();
+    if (sel != null){ cur = byId(sel); showInfo(cur); }
+    else { cur = null; showInfo(null); }
+  }
+
+  /* ---------- 右侧面板 ---------- */
+  var inc, fnum, flabel, infoEl;
+  function buildPanel(){
+    panel.innerHTML = '';
+    var h = document.createElement('h3'); h.textContent = '这一池';
+    panel.appendChild(h);
+    var meta = document.createElement('div'); meta.className = 'meta'; meta.id = panelId + '-meta';
+    panel.appendChild(meta);
+    var k1 = document.createElement('div'); k1.className = 'k'; k1.textContent = '选中的球';
+    panel.appendChild(k1);
+    infoEl = document.createElement('div'); infoEl.className = 'info'; infoEl.textContent = '点一颗球看看';
+    panel.appendChild(infoEl);
+
+    var k2 = document.createElement('div'); k2.className = 'k'; k2.textContent = '改它';
+    panel.appendChild(k2);
+    fnum = document.createElement('input'); fnum.className = 'field'; fnum.type = 'text';
+    fnum.placeholder = '编号（留空 = 变回没编号）'; panel.appendChild(fnum);
+    flabel = document.createElement('input'); flabel.className = 'field'; flabel.type = 'text';
+    flabel.placeholder = '这一段要回答什么？'; panel.appendChild(flabel);
+    var bApply = mkBtn('应用改动', 'gold'); panel.appendChild(bApply);
+    var bProm = mkBtn('捞进队列（给它一个编号）', 'ghost'); panel.appendChild(bProm);
+    var bMat = mkBtn('给它加一颗素材'); panel.appendChild(bMat);
+    var bDel = mkBtn('把这一颗捞出来扔掉'); panel.appendChild(bDel);
+
+    var k3 = document.createElement('div'); k3.className = 'k'; k3.textContent = '池子';
+    panel.appendChild(k3);
+    var bNew = mkBtn('投一颗新球（没编号）'); panel.appendChild(bNew);
+
+    var lg = document.createElement('div'); lg.className = 'legend';
+    lg.innerHTML = '<span><i style="background:linear-gradient(140deg,#a9defa,#17527f)"></i>已定顺序</span>' +
+                   '<span><i style="background:linear-gradient(140deg,#5d7c90,#2c4455)"></i>未定顺序</span>' +
+                   '<span><i style="background:linear-gradient(140deg,#b6e3fa,#2c7cb1)"></i>素材球</span>';
+    panel.appendChild(lg);
+
+    bApply.onclick = function(){
+      if (!cur) return;
+      setLabel(cur.id, flabel.value);
+      setNum(cur.id, fnum.value.trim());
+      refreshEdit();       /* 改完编号后可能整体顺延，输入框要跟着回落 */
+    };
+    bProm.onclick = function(){ if (!cur) return; promote(cur.id); refreshEdit(); };
+    bMat.onclick  = function(){ if (!cur) return; addMat(cur.id); refreshEdit(); };
+    bDel.onclick  = function(){
+      if (!cur) return;
+      var id = cur.id; cur = null; remove(id); refreshEdit();
+    };
+    bNew.onclick  = function(){ addPlain(); refreshEdit(); };
+    fnum.addEventListener('keydown', function(e){ if (e.key === 'Enter') bApply.click(); });
+    flabel.addEventListener('keydown', function(e){ if (e.key === 'Enter') bApply.click(); });
+  }
+  function mkBtn(txt, cls){
+    var b = document.createElement('button');
+    b.className = 'btn' + (cls ? ' ' + cls : '');
+    b.type = 'button'; b.textContent = txt; return b;
+  }
+  function meta(){
+    var done = ordered().length, tot = items.length, mats = 0;
+    for (var i=0;i<items.length;i++) mats += items[i].mats;
+    var el = document.getElementById(panelId + '-meta'); if (!el) return;
+    el.innerHTML = '共 <b>' + tot + '</b> 颗 · 已定顺序 <b>' + done + '</b> · 未定 <b>' + (tot-done) +
+                   '</b><br>素材球合计 <b>' + mats + '</b> 颗';
+  }
+  function showInfo(it){
+    if (!infoEl) return;
+    if (!it){ infoEl.innerHTML = '<span class="non">点一颗球看看</span>'; return; }
+    var seg = it.n == null ? '<span class="non">未编号</span>' : ('第 <b>' + it.n + '</b> 段');
+    infoEl.innerHTML = seg + ' · 素材 <b>' + it.mats + '</b> 颗' +
+      (it.label ? '<br><span class="non">' + esc(it.label) + '</span>' : '');
+  }
+  function refreshEdit(){
+    if (!cur){ if (fnum){ fnum.value = ''; flabel.value = ''; } return; }
+    fnum.value = cur.n == null ? '' : String(cur.n);
+    flabel.value = cur.label || '';
+    showInfo(cur);
+    meta();
+  }
+  function esc(s){ return String(s).replace(/[&<>]/g, function(c){
+    return c === '&' ? '&amp;' : c === '<' ? '&lt;' : '&gt;'; }); }
+
+  /* ---------- 渲染 ---------- */
+  function fit(){
+    var w = basin.clientWidth, h = basin.clientHeight;
+    if (!w || !h) return false;
+    if (w === W && h === H) return true;
+    W = w; H = h; dpr = Math.min(2, window.devicePixelRatio || 1);
+    [back, front].forEach(function(c){
+      c.width = Math.round(W*dpr); c.height = Math.round(H*dpr);
+      c.style.width = W + 'px'; c.style.height = H + 'px';
+    });
+    bx.setTransform(dpr,0,0,dpr,0,0);
+    fx.setTransform(dpr,0,0,dpr,0,0);
+    for (var i=0;i<items.length;i++){
+      var r = radiusFor(items[i]);
+      if (!items[i].placed) place(items[i]);          /* 第一次拿到真实尺寸才落座 */
+      else items[i].x = Math.max(r+8, Math.min(W-r-8, items[i].x));
+    }
+    return true;
+  }
+
+  function surfacePath(ctx, t){
+    ctx.beginPath();
+    ctx.moveTo(-12, surfY(-12, t));
+    for (var x=-12; x<=W+12; x+=8) ctx.lineTo(x, surfY(x, t));
+    ctx.lineTo(W+12, H+12); ctx.lineTo(-12, H+12); ctx.closePath();
+  }
+
+  function drawBack(t){
+    bx.clearRect(0,0,W,H);
+    bx.save();
+    surfacePath(bx, t); bx.clip();
+    /* 深水：越深越暗越蓝 */
+    var g = bx.createLinearGradient(0, H*0.15, 0, H);
+    g.addColorStop(0,   'rgba(20,64,95,.92)');
+    g.addColorStop(0.45,'rgba(13,36,56,.96)');
+    g.addColorStop(1,   'rgba(5,12,20,1)');
+    bx.fillStyle = g; bx.fillRect(0,0,W,H);
+
+    /* 分层的层线：只是给眼睛一个「深度」的刻度 */
+    bx.strokeStyle = 'rgba(180,225,250,.055)'; bx.lineWidth = 1;
+    for (var y = H*0.30; y < H-10; y += 84){
+      bx.beginPath();
+      bx.moveTo(0, y + Math.sin(t*0.5 + y*0.01)*2);
+      for (var x=0; x<=W; x+=14) bx.lineTo(x, y + Math.sin(t*0.5 + x*0.006 + y*0.01)*2.4);
+      bx.stroke();
+    }
+    /* 水下光斑（caustics）：几条缓慢横移的亮带 */
+    var cn = S.causticN;
+    for (var j=0;j<cn;j++){
+      var cy = H*0.26 + j*(H*0.72/cn) + Math.sin(t*0.4 + j)*6;
+      bx.beginPath();
+      bx.moveTo(0, cy);
+      for (var x2=0; x2<=W; x2+=10){
+        var yy = cy + Math.sin(x2*0.012 + t*(0.5+j*0.11)) * (7 + j*1.4)
+                    + Math.sin(x2*0.031 - t*(0.8+j*0.06)) * 3;
+        bx.lineTo(x2, yy);
+      }
+      bx.strokeStyle = 'rgba(196,236,255,' + (0.05 + S.caustic*0.055) + ')';
+      bx.lineWidth = 1.4; bx.stroke();
+    }
+    /* 气泡 */
+    if (S.bubble){
+      for (var b2=0;b2<bubbles.length;b2++){
+        var bb = bubbles[b2];
+        bx.beginPath(); bx.arc(bb.x, bb.y, bb.r, 0, 6.2832);
+        bx.fillStyle = 'rgba(214,242,255,' + (0.10 + bb.r*0.03) + ')'; bx.fill();
+      }
+    }
+    /* 涟漪（同心圆，往外扩、淡出） */
+    for (var k=0;k<ripples.length;k++){
+      var rp = ripples[k];
+      var r = rp.r0 + rp.age * rp.sp;
+      var a = Math.max(0, 1 - rp.age / rp.life) * 0.5 * rp.k;
+      bx.beginPath(); bx.arc(rp.x, rp.y, r, 0, 6.2832);
+      bx.strokeStyle = 'rgba(190,232,255,' + a + ')'; bx.lineWidth = 1.6; bx.stroke();
+      if (rp.k > 0.6){
+        bx.beginPath(); bx.arc(rp.x, rp.y, r*0.62, 0, 6.2832);
+        bx.strokeStyle = 'rgba(190,232,255,' + (a*0.5) + ')'; bx.lineWidth = 1; bx.stroke();
+      }
+    }
+    bx.restore();
+  }
+
+  function drawFront(t){
+    fx.clearRect(0,0,W,H);
+    fx.save();
+    surfacePath(fx, t); fx.clip();
+    /* 水膜：盖在球上面的一层冷色，越深越厚 —— 这就是「分层」的来源 */
+    var f = fx.createLinearGradient(0, H*0.15, 0, H);
+    f.addColorStop(0,   'rgba(120,190,230,' + S.film[0] + ')');
+    f.addColorStop(0.5, 'rgba(80,150,200,' + (S.film[0]+0.07) + ')');
+    f.addColorStop(1,   'rgba(40,100,150,' + S.film[1] + ')');
+    fx.fillStyle = f; fx.fillRect(0,0,W,H);
+
+    /* 扫光：一道缓慢横移的环境光 */
+    var sw = 260, sx = ((t*46) % (W + sw*2)) - sw;
+    var sg = fx.createLinearGradient(sx, 0, sx + sw, H*0.9);
+    sg.addColorStop(0, 'rgba(255,255,255,0)');
+    sg.addColorStop(0.5, 'rgba(226,248,255,.055)');
+    sg.addColorStop(1, 'rgba(255,255,255,0)');
+    fx.fillStyle = sg; fx.fillRect(0,0,W,H);
+
+    /* 波面亮线 */
+    fx.beginPath(); fx.moveTo(-12, surfY(-12, t));
+    for (var x=-12; x<=W+12; x+=6) fx.lineTo(x, surfY(x, t));
+    fx.strokeStyle = 'rgba(226,250,255,.62)'; fx.lineWidth = 1.6; fx.stroke();
+    fx.strokeStyle = 'rgba(255,255,255,.16)'; fx.lineWidth = 4.5; fx.stroke();
+    fx.restore();
+  }
+
+  function drawBalls(){
+    for (var i=0;i<items.length;i++){
+      var it = items[i], nd = nodes[it.id]; if (!nd) continue;
+      var r = radiusFor(it);
+      var y = yOf(it);
+      it.y = y;
+      /* 越深：越小、越暗（水膜已经替我们压暗了一层，这里只补一点点） */
+      var s = 1 - it.depth*0.14;
+      var op = 1 - it.depth*0.30;
+      nd.el.style.transform = 'translate(' + (it.x - r) + 'px,' + (y - r) + 'px) scale(' + s.toFixed(3) + ')';
+      nd.el.style.opacity = op.toFixed(3);
+      nd.el.style.zIndex = String(100 - Math.round(it.depth*60));
+      /* 素材球：静态挂在这一段周围的一圈上，不自己转 */
+      for (var j=0;j<nd.mats.length;j++){
+        var m = nd.mats[j];
+        var rr = r + 14 + Math.min(10, j*2.4);
+        m.style.transform = 'translate(' + (Math.cos(m._a)*rr - m._r) + 'px,' +
+                            (Math.sin(m._a)*rr*0.94 - m._r) + 'px)';
+      }
+    }
+  }
+
+  function initBubbles(){
+    bubbles = [];
+    for (var i=0;i<S.bubble;i++){
+      bubbles.push({ x:Math.random()*900, y:Math.random()*500, r:1.2+Math.random()*2.4,
+                     sp:8+Math.random()*22 });
+    }
+  }
+
+  /* ---------- 主循环 ---------- */
+  /* 动的只有水：波面、光斑、涟漪、气泡。球一动不动，等你拖它。 */
+  function frame(t, dt){
+    if (basin.offsetParent === null) return;      /* 藏起来了就别烧 CPU */
+    if (!fit()) return;
+    for (var i=ripples.length-1;i>=0;i--){
+      ripples[i].age += dt;
+      if (ripples[i].age > ripples[i].life) ripples.splice(i,1);
+    }
+    for (var b=0;b<bubbles.length;b++){
+      bubbles[b].y -= bubbles[b].sp * dt;
+      bubbles[b].x += Math.sin(t*1.4 + bubbles[b].y*0.02) * 0.25;
+      if (bubbles[b].y < H*0.19){ bubbles[b].y = H*0.96; bubbles[b].x = Math.random()*W; }
+    }
+    drawBack(t);
+    drawBalls();
+    drawFront(t);
+  }
+
+  /* ---------- 起池 ---------- */
+  buildPanel();
+  initBubbles();
+  /* 先给一个占位尺寸，等第一帧 fit() 拿到真实尺寸再让球落座 */
+  W = 900; H = 560;
+  mkItem(1, 3); mkItem(2, 1); mkItem(3, 4); mkItem(4, 2); mkItem(5, 2);
+  mkItem(null, 2); mkItem(null, 0);
+  sync();
+
+  return { frame: frame };
+}
+
+/* ================= 三个池子 ================= */
+var pools = [];
+pools.push(makePool('bA','pA','A'));
+pools.push(makePool('bB','pB','B'));
+pools.push(makePool('bC','pC','C'));
+
+var last = performance.now();
+function loop(now){
+  var dt = Math.min(0.05, (now - last) / 1000);
+  if (!(dt > 0)) dt = 0.016;
+  last = now;
+  for (var i=0;i<pools.length;i++) if (pools[i]) pools[i].frame(now/1000, dt);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* ---------- tab ---------- */
+var tabs = document.querySelectorAll('nav.tabs button');
+function show(id){
+  tabs.forEach(function(b){ b.setAttribute('aria-selected', String(b.dataset.t === id)); });
+  document.querySelectorAll('section').forEach(function(s){ s.hidden = (s.id !== id); });
+  window.dispatchEvent(new Event('resize'));
+  window.scrollTo({ top:0, behavior:'instant' });
+}
+tabs.forEach(function(b){ b.addEventListener('click', function(){ show(b.dataset.t); }); });
+var hsh = (location.hash || '').replace('#','');
+if (document.getElementById(hsh)) show(hsh);
+})();
+</script>
+</body>
+</html>
