@@ -12,6 +12,7 @@ import shutil
 import socket
 import sys
 import threading
+import time
 import webbrowser
 
 import brain
@@ -48,6 +49,8 @@ class App:
         # 取写都走 store.list_chat / store.add_chat；重启后「已照做」态也在。
         self._chat_gen = 0
         self._chat_busy = False     # 在等模型回话（界面上要说"正在想"，别让人干等）
+        self._live = ""             # 正在流式吐出来的那句（§2.33）：还没落库，界面直接显示
+        self._stop = None           # 流式的「停」闸（threading.Event）；新一句会重置
         # 一期记忆（§2.28）：后台蒸馏"已定口径"，失败保留旧记忆、不打断主流程
         self._mem_gen = 0
         self._mem_busy = False
@@ -339,6 +342,7 @@ class App:
             "suggest_busy": self._sq_busy,
             "suggest_queries": list(self._sq),
             "chat_busy": self._chat_busy,
+            "live": self._live,          # 正在流式吐出来的那句（§2.33）
         }
 
     @staticmethod
@@ -824,6 +828,9 @@ class App:
         self._chat_gen += 1
         gen = self._chat_gen
         self._chat_busy = True          # 界面要说"正在想"，别让人对着空气等
+        self._live = ""
+        self._stop = threading.Event()
+        stop = self._stop
         t = self.topic()
         # 给模型看**整口池子**：已编排 + 未编排的每一颗球（含未指派素材），
         # 它才能用工具去改任意一颗球（§2.26）。落地时再按 id 复核。
@@ -837,11 +844,46 @@ class App:
                 mcp_c = mcp.get_client()
             except Exception:
                 mcp_c = None
-            got = brain.llm_chat(t, beats, mbb, history, text, un, mcp=mcp_c)
+            got = brain.llm_chat(t, beats, mbb, history, text, un, mcp=mcp_c,
+                                 on_delta=self._mk_delta(gen, tid),
+                                 should_stop=stop.is_set)
             self._cq.put(lambda: self._chat_land(gen, tid, got))
 
         threading.Thread(target=work, daemon=True).start()
         self.panel.refresh()
+
+    def _mk_delta(self, gen, tid):
+        """把后台线程的流式增量**节流**转发到主线程（§2.33）。
+
+        每次 delta 都往队列塞会淹掉 Qt 事件循环 —— 按 50ms 合并一次，只推"当前全文"。
+        piece=None 表示清空重来（MCP 收口那轮要覆盖上一轮的临时内容）。
+        """
+        acc = {"s": "", "last": 0.0}
+
+        def on_delta(piece):
+            if piece is None:
+                acc["s"] = ""
+            else:
+                acc["s"] += piece
+            now = time.time()
+            if piece is None or now - acc["last"] >= 0.05:
+                acc["last"] = now
+                txt = acc["s"]
+                self._cq.put(lambda: self._stream_land(gen, tid, txt))
+        return on_delta
+
+    def _stream_land(self, gen, tid, text):
+        """流式增量回主线程：只更新那一句"活的"AI 回复，不整面板重建。"""
+        if gen != self._chat_gen or tid != self.current_id:
+            return
+        self._live = text
+        if self.panel.isVisible():
+            self.panel.push_live(text)
+
+    def stop_stream(self):
+        """点「停」：让正在跑的流式请求提前收口（已拿到的部分照常落库）。"""
+        if self._stop is not None:
+            self._stop.set()
 
     def _ball_label(self, bid):
         """把球的 id 说成人话：已编排的报段号，未编排的直说。"""
@@ -860,6 +902,7 @@ class App:
         if gen != self._chat_gen or tid != self.current_id:
             return                      # 换期了或者又说了新的一句，这句作废
         self._chat_busy = False
+        self._live = ""                 # 这句已经落库了，活的流式态清掉（§2.33）
         if got is None:
             self._chat_append(tid, "sys",
                 "模型这次没答上来（超时或返回的不是 JSON），这句我没接住。")

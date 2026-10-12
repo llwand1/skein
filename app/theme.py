@@ -208,6 +208,12 @@ QFrame#searchcard { background: #1a1712; border: none; border-top: 1px solid #3a
 /* 设置抽屉（§2.25）：和对话/搜索一样的抬升层，只在顶部拉一条发丝线 */
 QFrame#settingscard { background: #1a1712; border: none; border-top: 1px solid #3a3226; }
 
+/* ---------- 对话里的富文本（§2.33）：自身不滚动、背景透给分组块 ---------- */
+QTextBrowser#rich, QTextBrowser#richturn {
+  background: transparent; border: none; padding: 0;
+}
+QTextBrowser#rich:focus, QTextBrowser#richturn:focus { border: none; outline: none; }
+
 /* ---------- 滚动区 ---------- */
 QScrollArea { border: none; background: transparent; }
 QScrollBar:vertical { background: transparent; width: 8px; margin: 4px 2px 4px 0; }

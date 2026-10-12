@@ -827,7 +827,8 @@ def _clip(s, n):
     return s if len(s) <= n else s[:n].rstrip() + "…"
 
 
-def llm_chat(topic, beats_all, mbb, history, user_text, unassigned=(), mcp=None):
+def llm_chat(topic, beats_all, mbb, history, user_text, unassigned=(), mcp=None,
+             on_delta=None, should_stop=None):
     """和模型聊这一期，并让它用工具改池子里的球。返回 {"reply": str, "actions": [...]}。
 
     actions 只是**提议**：界面上要人点一下「照做」才落地（动不动永远由人裁决，P-010/P-013）。
@@ -837,6 +838,10 @@ def llm_chat(topic, beats_all, mbb, history, user_text, unassigned=(), mcp=None)
     mcp 非空 = 这次对话额外挂上 tinyfish MCP 的**只读搜索工具**（§2.31）：
     模型调它 → **当场执行**（只读、把结果回填）→ 最多再转 1 轮收口；池子改球工具**照旧只当提议**。
     mcp=None 时行为与从前**完全一致**。
+
+    on_delta 非空 = **流式**（§2.33）：每收到一段增量就回调 on_delta(str)，界面边收边显示；
+    on_delta(None) 表示"清空重来"（收口那轮覆盖上一轮的临时内容）。
+    should_stop 非空 = 可中断（返回 True 就提前收口，把已拿到的部分交出去）。
     """
     his = "\n".join("%s：%s" % ("他" if h.get("role") == "you" else "你",
                                 _clip(h.get("text"), 240))
@@ -870,13 +875,21 @@ def llm_chat(topic, beats_all, mbb, history, user_text, unassigned=(), mcp=None)
 
     # 单次请求的超时：挂了搜索工具后请求明显更慢，默认 25s 太紧（P-021 实测踩过）。
     round_timeout = 45
+
+    def _ask(msgs, with_tools=True):
+        """一次请求：给了 on_delta 就走**流式**（边收边推给界面），否则一次性拿（老路）。"""
+        kw = dict(temperature=0.7, timeout=round_timeout)
+        if with_tools:
+            kw.update(tools=tools_all, tool_choice="auto")
+        if on_delta is None:
+            return llm.chat_message(msgs, **kw)
+        return llm.chat_stream(msgs, on_delta, should_stop=should_stop, **kw)
+
     got = None
     if llm.available():
         try:
-            msg = llm.chat_message([{"role": "system", "content": system},
-                                    {"role": "user", "content": user}],
-                                   temperature=0.7, timeout=round_timeout,
-                                   tools=tools_all, tool_choice="auto")
+            msg = _ask([{"role": "system", "content": system},
+                        {"role": "user", "content": user}])
         except Exception as e:
             llm.LAST_ERROR = "%s: %s" % (type(e).__name__, e)
             msg = None
@@ -905,14 +918,15 @@ def llm_chat(topic, beats_all, mbb, history, user_text, unassigned=(), mcp=None)
                 digest = _clip("\n\n".join(hits), 1500)
                 # 收口：**只把搜到的内容丢回去**，池子/历史/工具一概不带 —— 又快又不易超时
                 # （早先带全套再请求，实测收口那一轮能跑到 45s+ 直接超时，P-021）。
+                if on_delta is not None:
+                    on_delta(None)      # 收口这轮覆盖掉上一轮的临时内容（§2.33）
                 try:
-                    m2 = llm.chat_message(
-                        [{"role": "system", "content": system},
-                         {"role": "user", "content":
-                          "这是我刚联网搜到的内容：\n%s\n\n"
-                          "请用两三句话，只挑跟这一期大纲相关、最有用的那点写成回复；"
-                          "别复述、别分点。" % (digest or "（没搜到）")}],
-                        temperature=0.7, timeout=round_timeout)
+                    m2 = _ask([{"role": "system", "content": system},
+                               {"role": "user", "content":
+                                "这是我刚联网搜到的内容：\n%s\n\n"
+                                "请用两三句话，只挑跟这一期大纲相关、最有用的那点写成回复；"
+                                "别复述、别分点。" % (digest or "（没搜到）")}],
+                              with_tools=False)
                     reply = str((m2 or {}).get("content") or "").strip() or reply
                 except Exception as e:
                     llm.LAST_ERROR = "%s: %s" % (type(e).__name__, e)

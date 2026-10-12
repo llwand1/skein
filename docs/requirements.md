@@ -1,6 +1,6 @@
 # Skein 需求文档
 
-> 版本：v0.20.0 | 状态：[WIP] | 更新：2026-10-12
+> 版本：v0.21.0 | 状态：[WIP] | 更新：2026-10-12
 > 项目：**Skein**（/skeɪn/，一绞线）｜ 内部代号／仓库名：task-orb ｜ 开工：2026-10-07
 > 当前状态一句话：需求已澄清，**MVP 桌面端开工中**。阶段顺序＝「原生从悬浮球开始」；完成判据＝「叙事饱和 + 人封顶」。本文档是项目唯一需求真相源。
 
@@ -155,6 +155,12 @@
 > "每次都要手动重启,改成自动重启吧,然后可以开源了,放到GitHub上好管理一些,并且设置一下自动更新流水线,以及做好readme(产品式的)"
 
 > 📌 落地：① **开发期自动重启** `dev-watch.py` / `dev.bat`（盯 `app/*.py` 的 mtime，一变就重启，不侵入应用代码）；② **开源**推 `github.com/llwand1/skein`（**MIT**；`成片/`、`*.db`、密钥、`__pycache__` 一律 `.gitignore` 不入库）；③ **发布流水线** `.github/workflows/release.yml`（推 `v*` tag → Actions 用 PyInstaller 打包 → 自动建 Release）；④ **应用内自动更新** `app/updater.py`（查 Releases → 下源码包 → 覆盖代码 → 自动重启）+ 设置组 6；⑤ **产品式 README.md**（放根目录）。见 §2.32。
+
+### P-023 · ★ 对话体验：流式 / Markdown / 历史折叠 / 动效（2026-10-12）
+
+> "这个ai对话还是需要打磨,手感不够好,并且历史对话要改成展开式,默认只看一轮对话,只有点击展开才会显示历史对话,然后还有流式ui和markdown效果等你都没有做,就是必要的通用对话效果要作全面,还要加一点炫技的前端效果"
+
+> 📌 落地：**流式**（`llm.chat_stream` SSE → `brain.llm_chat(on_delta)` → `main` 节流中继 → `panel` 就地更新，§2.33）；**Markdown**（`markdown` 库转 HTML + `QTextBrowser` 富文本，零 WebEngine）；**历史折叠**（默认只露最近一轮，点「展开历史（N 条）」才全量）；**通用对话效果**（流式光标、可中断「停」、发送中禁用输入、三点呼吸等待态）；**炫技动效**（消息入场淡入、光标闪烁、三点呼吸）。见 §2.33。
 
 ---
 
@@ -751,6 +757,34 @@ CREATE TABLE IF NOT EXISTS chat(
 
 ---
 
+### 2.33 ★ 对话体验：流式 · Markdown · 历史折叠 · 动效（v0.21.0）
+
+老板原话见 P-023。对话是这一期的"主界面"，手感要跟上通用聊天工具。
+
+**① 流式（`llm.chat_stream` → `brain.llm_chat(on_delta)` → `main` → `panel`）**
+- `llm.chat_stream(messages, on_delta, ...)`：标准库 urllib 逐行读 **SSE**（`data:` 行），每段增量回调；**同构返回**聚合后的 message（content 全文 + 流式拼起来的 `tool_calls`）—— 上层照旧当非流式结果处理。实测网关支持（`text/event-stream`，首片 ~7s、之后 ~1s 吐完 141 片）。
+- `brain.llm_chat(..., on_delta, should_stop)`：给了 `on_delta` 就走流式，否则走原来的一次性；**MCP 收口那轮也流式**，并先发 `on_delta(None)` **清空重来**（避免上一轮临时内容残留）。
+- `main`：`_mk_delta` 把后台线程的增量**按 50ms 节流**成"当前全文"投进 `_cq`（每次 delta 都塞队列会淹掉 Qt 事件循环），`_stream_land` 带代际守卫防串台。
+- `panel.push_live`：**只更新那一句"活体"**（`RichText.set_html`），**不整面板重建** —— 面板是"每次刷新重建整棵子树"，流式绝不能走 refresh。
+
+**② Markdown 渲染**
+- 用 **`markdown` 库**转 HTML（`fenced_code` / `tables` / `sane_lists` / `nl2br`），样式经 `QTextDocument.setDefaultStyleSheet` 注入，贴 A·纪律（字号 12/13/15）。
+- **不装 QtWebEngine**（太重、与 QPainter 自绘美学不搭）：自定义 `RichText(QTextBrowser)` —— 关掉自身滚动条、按内容自适应高度，链接走 `anchorClicked → app.open_url`。
+- `markdown` 加入 `app/requirements.txt` 与 CI 依赖；**失败退化为转义纯文本**（绝不抛）。
+
+**③ 历史折叠**
+- 默认**只渲染最近一轮**（`log[-2:]`，1 问 1 答），上面一条「展开历史（N 条）」细条；点开渲染 `log[-40:]` 并变成「收起历史」。展开态只活在内存（不跨期、不落库）。
+
+**④ 通用对话效果 + 炫技动效**
+- 等待态：还没收到首片时显示 `ThinkingDots`（三点呼吸，QPainter 自绘，不用字形）。
+- 流式光标：`▍` 挂在句尾、520ms 闪烁；流式结束后由落库那条接替。
+- 入场：最新那条消息 `QGraphicsOpacityEffect + QPropertyAnimation` **淡入**（只给"新来的"那块，不每条重播；`ANIMATE=False` 时全关，走查保持确定性）。
+- 可中断：发送后输入框禁用、出现「停」（`should_stop` 让流式提前收口，**已吐出的部分照常落库**）。
+
+**测试**：`uitest` 加 Markdown 渲染 + 历史折叠（默认 2 条 → 展开 6 条）断言；`llmtest` 加 `fake_stream` 桩（**复用 `chat_message` 的桩**，所有 monkeypatch 自动对"流式那条路"生效）+ 「增量拼起来 == 最终回复」「流式下工具调用照样带回来」断言。compileall + uitest + llmtest 全绿；真机流式实测通过。
+
+---
+
 ## §3 明确不做（红线）
 
 | 不做 | 依据 |
@@ -843,4 +877,5 @@ CREATE TABLE IF NOT EXISTS chat(
 | 2026-10-11 | v0.19.1 | **修 MCP 不生效（§2.31 / P-021）**：老板实测反馈"Skein 的 AI 回复说它自己没有联网搜索工具"。查库坐实两条根因 —— ① `settings.json` 里**根本没有 `mcp_enabled`**（v0.19.0 设计为默认关，老板没进设置勾选）→ `get_client()` 返回 None → 塞给模型的工具里压根没有搜索工具，故 AI 如实回"我这没接搜索工具"；② 即便开了，**系统提示词 `_CHAT_TAIL` 只描述了改球工具、没告诉模型"你能联网"** → 模型看到 `tf_search` 也不会当自己有能力。修法（方案 A）：**① MCP 默认改成开**（`mcp.enabled()` 缺省 True、`panel._load_settings_form` 同步；显式 false 才关；node/mcp-remote 找不到本就静默降级，无副作用，符合 P-021"最基本的搜索能力"）；**②`brain.llm_chat` 在有搜索工具时往 system 追加一句**"你现在能联网：可以调用 tf_search 联网搜索、读取网页正文…别声称自己没有联网能力"。测试：`uitest`/`llmtest` 均**桩掉 `mcp.get_client`**（默认开后否则每次 say 都会拉 node、打真网络），`llmtest` 加"提示词明说能联网"断言、`uitest` 改"开关默认开"；compileall + uitest + llmtest 全绿 |
 | 2026-10-11 | v0.19.2 | **MCP 真机仍失败 → 定位到"收口轮超时"并重构（§2.31 / P-021）**：老板二次反馈"实际使用还是没有成功，且对话会一直变长"。**查库 + 实测复现**坐实根因：① `llm.chat_message` 默认 **TIMEOUT=25s**，挂搜索后收口那一轮（带全套池子/历史/工具 + 结果回填）实测能跑 **45s+**，超时抛错 → 老代码 `break` 把整条丢掉 → `got=None` → 界面回"模型这次没答上来"（DB 里 23:11 那条 sys 就是它）；② `mcp.get_client()` 会**缓存连不上的空壳**实例，一次失败 → 永久没搜索；③ 对话越聊越长 = 历史每条原文喂回 + 模型整段复述搜索结果。**修法**：① 搜索改成"**一次收口**"——搜到内容后**只把结果单独发一次收口请求**（不带池子/历史/工具），又快又不易超时；收口失败则**直接摘原文兜底**（绝不空手）；单轮超时提到 45s、回复限长 400 字；② `get_client()` 连不上**不缓存**，下次重试；③ 开机 `_kick_mcp_warm()` 后台预热连接；④ 喂回模型的"最近聊过" 8 条→6 条、每条截 240 字；`RESULT_CHARS` 4000→1500。**实测**：真实模型跑通（`tf_search` 真调用成功、回复压到 ~130 字、`last_error=None`）。测试：`llmtest` 加"收口轮超时也不丢整条"断言；compileall + uitest + llmtest 全绿 |
 | 2026-10-12 | v0.20.0 | **开源 + 自动更新 + 开发期自动重启（§2.32 / P-022）**：老板要"每次都要手动重启改成自动重启、开源放 GitHub 好管理、设置自动更新流水线、做产品式 README"。① **开发期自动重启**：新增 `dev-watch.py`（轮询 `app/` 下 `.py` mtime，变了就先杀光在跑的 Skein 再带控制台重启，不侵入应用代码）+ `dev.bat` 一键入口；② **开源**：`.gitignore`（排 `__pycache__`/`成片/`/`*.db`/`llm.json`/`.mcp-auth/`）+ MIT `LICENSE`，`git init` 后推 `github.com/llwand1/skein`（公开）；③ **发布流水线**：`.github/workflows/release.yml`（推 `v*` tag → PyInstaller 打包 `Skein.exe` → 自动建 Release），打 `v0.20.0` tag 已触发；④ **应用内自动更新**：新增 `app/updater.py`（`config.VERSION` 唯一真相源 + `check/apply/restart_now`，只覆盖代码不碰用户数据）+ `main` 的检查/下载/重启接线 + 设置抽屉**组 6「更新」**（检查更新 / 下载并更新 / 启动时自动检查更新），开机后台静默查；⑤ **产品式 `README.md`**（根目录）+ `config.py` 加 `VERSION`/`GITHUB_OWNER`/`GITHUB_REPO` 并修正过时的注释（`mcp` 的 clientInfo 版本号也改成跟 `config.VERSION` 走，防漂移）。测试：`uitest` 加组 6 断言、两套走查均桩掉 `updater.check`；compileall + uitest + llmtest 全绿 |
+| 2026-10-12 | v0.21.0 | **对话体验：流式 / Markdown / 历史折叠 / 动效（§2.33 / P-023）**：老板要"对话手感不够好：历史改成展开式默认只看一轮、要流式 UI 和 Markdown、通用对话效果做全、加点炫技动效"。① **流式**：`llm.chat_stream`（标准库 urllib 读 SSE，同构返回聚合 message + 流式拼 `tool_calls`）→ `brain.llm_chat(on_delta/should_stop)`（MCP 收口那轮也流式，先 `on_delta(None)` 清空重来）→ `main._mk_delta` 按 50ms 节流投 `_cq` → `panel.push_live` **只就地更新活体、不整面板重建**。**实测**网关支持流式（首片 ~7s、总 ~11s，141 片）。② **Markdown**：`markdown` 库转 HTML + `QTextDocument.setDefaultStyleSheet` 贴主题；自定义 `RichText(QTextBrowser)`（无滚动条、按内容自适应、链接走 `open_url`），**不装 QtWebEngine**；加入 requirements 与 CI。③ **历史折叠**：默认只渲染最近一轮，`log[-2:]`，「展开历史（N 条）」（N=总条数-2）细条点击展开 `log[-40:]`，再点收起。④ **通用效果 + 动效**：`ThinkingDots` 三点呼吸等待态、流式 `▍` 光标 520ms 闪烁、最新一条消息淡入（`QGraphicsOpacityEffect`）、发送后禁用输入 + 「停」可中断。测试：`uitest` 加 Markdown / 历史折叠断言（默认 2 条 → 展开 6 条），`llmtest` 加 `fake_stream` 桩 + 「增量拼==最终回复」「流式下工具调用照样带回来」；compileall + uitest + llmtest 全绿 |
 

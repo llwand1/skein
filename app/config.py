@@ -6,7 +6,7 @@ import json
 APP_NAME = "Skein"
 
 # 版本号（唯一真相源）：打 tag / 出 Release / 应用内检查更新都以它为准（§2.32）。
-VERSION = "0.20.0"
+VERSION = "0.21.0"
 # 更新源（§2.32）：GitHub Releases 的仓库位置。
 GITHUB_OWNER = "llwand1"
 GITHUB_REPO = "skein"

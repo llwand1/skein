@@ -186,11 +186,29 @@ def pump(qapp, secs):
         time.sleep(0.02)
 
 
+def fake_stream(messages, on_delta, **kw):
+    """桩：流式版（§2.33）—— **复用当前 llm.chat_message 的桩**，拿到结果后把内容分片吐出去。
+
+    这样所有对 chat_message 的 monkeypatch（boom / boom_tools / _search_then_boom …）
+    都自动对"流式那条路"生效，不用到处改。
+    """
+    if on_delta:
+        on_delta(None)                 # 先清空（收口那轮的语义）
+    msg = llm.chat_message(messages, **kw)
+    text = str((msg or {}).get("content") or "")
+    if on_delta and text:
+        step = max(1, len(text) // 6)
+        for i in range(0, len(text), step):
+            on_delta(text[i:i + step])
+    return msg
+
+
 def run():
     qapp = QApplication.instance() or QApplication([])
     qapp.setStyleSheet(theme.QSS)
     llm.chat = fake_chat              # 换桩（JSON 协议 / 其余各步）
     llm.chat_message = fake_message   # 原生 tool_calls 那条路
+    llm.chat_stream = fake_stream     # 流式那条路（§2.33）：复用上面的桩
     assert llm.available(), "桩 key 没生效"
 
     # ---------- 1 JSON 抠取 ----------
@@ -388,6 +406,22 @@ def run():
     llm.chat_message = _saved
     check(g3 is not None and (g3.get("reply") or "").strip(),
           "收口轮超时也不丢整条（有兜底回复）：%s" % ((g3 or {}).get("reply"),))
+
+    # ---------- 4f 流式（§2.33）：边收边吐，增量拼起来 == 最终回复 ----------
+    print("\n[STEP] 流式 · 增量回调 + 聚合结果一致（§2.33）")
+    seen = []
+    got_s = brain.llm_chat(t, beats_all, mbb2, [], "从成本切", (), mcp=None,
+                           on_delta=lambda p: seen.append(p))
+    check(any(p is None for p in seen), "先发一次「清空」信号（on_delta(None)）")
+    joined = "".join(p for p in seen if p)
+    check(got_s and joined == (got_s.get("reply") or ""),
+          "增量拼起来 == 最终回复：%r" % joined[:20])
+    check([a.get("tool") for a in (got_s or {}).get("actions") or []]
+          == ["rename_ball", "add_ball", "drop_ball"],
+          "流式下工具调用照样带回来：%s"
+          % [a.get("tool") for a in (got_s or {}).get("actions") or []])
+    check(len([p for p in seen if p]) >= 2, "至少分成多片吐（实际 %d 片）"
+          % len([p for p in seen if p]))
 
     # ---------- 5 节点深挖：详细论证 / 发散 -------------
     print("\n[STEP] 节点深挖 · 详细论证这一点 + 就这一点发散")

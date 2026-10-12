@@ -145,6 +145,73 @@ def chat(messages, temperature=0.6, timeout=TIMEOUT):
     return chat_message(messages, temperature=temperature, timeout=timeout).get("content") or ""
 
 
+def chat_stream(messages, on_delta, temperature=0.6, timeout=TIMEOUT,
+                tools=None, tool_choice=None, should_stop=None):
+    """流式 chat.completions：每来一段增量就回调 `on_delta(str)`。
+
+    返回**聚合后的 message dict**（与 chat_message 同构：content 全文 + tool_calls），
+    上层像处理非流式结果一样处理即可。异常照旧往上抛（调用方降级）。
+
+    只走标准库：urllib 拿到的是类文件对象，逐行读 SSE 就行 —— 不引第三方 SDK。
+    `on_delta(None)` = **清空重来**（同一次对话里"收口"那轮要覆盖上一轮的临时内容）。
+    `should_stop()` 返回 True 时提前收口（把已经拿到的部分返回，不抛）。
+    """
+    c = config()
+    if not c["key"]:
+        raise RuntimeError("SKEIN_LLM_KEY 未设置")
+    payload = {"model": c["model"], "messages": messages,
+               "temperature": temperature, "stream": True}
+    if tools:
+        payload["tools"] = tools
+        if tool_choice:
+            payload["tool_choice"] = tool_choice
+    req = urllib.request.Request(
+        c["base"] + "/chat/completions",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json",
+                 "Authorization": "Bearer " + c["key"],
+                 "Accept": "text/event-stream"})
+    parts = []
+    calls = {}      # index -> {"id","type","function":{"name","arguments"}}（流式里是分片拼起来的）
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        for raw in r:
+            if should_stop and should_stop():
+                break
+            line = raw.decode("utf-8", "replace").strip()
+            if not line or not line.startswith("data:"):
+                continue
+            data = line[5:].strip()
+            if data == "[DONE]":
+                break
+            try:
+                obj = json.loads(data)
+                delta = obj["choices"][0].get("delta") or {}
+            except Exception:
+                continue
+            piece = delta.get("content")
+            if piece:
+                parts.append(piece)
+                try:
+                    on_delta(piece)
+                except Exception:
+                    pass
+            for tc in (delta.get("tool_calls") or []):
+                i = tc.get("index", 0)
+                slot = calls.setdefault(i, {"id": "", "type": "function",
+                                            "function": {"name": "", "arguments": ""}})
+                if tc.get("id"):
+                    slot["id"] = tc["id"]
+                fn = tc.get("function") or {}
+                if fn.get("name"):
+                    slot["function"]["name"] += fn["name"]
+                if fn.get("arguments"):
+                    slot["function"]["arguments"] += fn["arguments"]
+    msg = {"role": "assistant", "content": "".join(parts)}
+    if calls:
+        msg["tool_calls"] = [calls[k] for k in sorted(calls)]
+    return msg
+
+
 def chat_async(messages, cb, **kw):
     """后台线程调用；cb(text or None) 保证被调用一次。"""
     def work():

@@ -767,6 +767,27 @@ def run():
         QApplication.processEvents()
     check(True, "空输入未崩溃")
 
+    # ---------- 对话体验（§2.33）：Markdown 渲染 / 历史折叠 ----------
+    step("对话体验 · Markdown / 历史折叠（§2.33）")
+    check("<strong>" in panelmod.md_html("**粗**") and "<code>" in panelmod.md_html("`x`"),
+          "Markdown 转 HTML（粗体 / 行内代码）")
+    check("<h2>" in panelmod.md_html("## 小标题"), "标题也认")
+    check("<li>" in panelmod.md_html("- 一\n- 二"), "列表也认")
+    tid = app.current_id
+    for txt in ("甲", "乙", "丙", "丁"):
+        app._chat_append(tid, "you" if len(store.list_chat(tid)) % 2 == 0 else "ai", txt)
+    app.panel.refresh()
+    bars = [b for b in app.panel.findChildren(QPushButton)
+            if b.objectName() == "hist_toggle"]
+    check(len(bars) == 1 and bars and "展开历史" in bars[0].text(),
+          "默认收起：就一条「展开历史」（实际 %s）" % [b.text() for b in bars])
+    collapsed = len(app.panel.findChildren(panelmod.RichText))
+    click(bars[0], "展开历史")
+    expanded = len(app.panel.findChildren(panelmod.RichText))
+    check(expanded > collapsed, "展开后渲染出更多历史（%d → %d）" % (collapsed, expanded))
+    check(any(b.objectName() == "hist_toggle" and "收起" in b.text()
+              for b in app.panel.findChildren(QPushButton)), "展开后能再收起")
+
     step("切换回灵感池")
     bs = buttons(app.panel, "切换")
     check(len(bs) >= 1, "找到切换按钮")
@@ -832,8 +853,8 @@ def run():
     app.panel._show_search = False
     app.panel.refresh()
 
-    # ---------- 设置（§2.25）：标题栏齿轮 → 模型 / 内容默认 / 系统提示词 三组 ----------
-    step("设置 · 标题栏齿轮 → 三组（模型 / 内容默认 / 系统提示词）")
+    # ---------- 设置（§2.25）：标题栏齿轮 → 六组 ----------
+    step("设置 · 标题栏齿轮 → 六组（模型 / 内容默认 / 系统提示词 / user.md / MCP / 更新）")
     check(len(by_obj(app.panel, "gear")) == 1,
           "标题栏有一枚齿轮（实际 %d）" % len(by_obj(app.panel, "gear")))
     click(by_obj(app.panel, "gear")[0], "打开设置抽屉")

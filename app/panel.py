@@ -26,6 +26,7 @@ PyQt 的两个坑（踩过，改前先看）：
   2. 刷新会重建整棵子树，而刷新常常就是从那棵树里某个控件的信号里发起的。
      所以旧内容走 takeWidget + deleteLater，**不能**让它被 setWidget 同步删掉。
 """
+import math
 import os
 import re
 import time
@@ -41,14 +42,16 @@ from basin import Basin
 from pool import Pool
 from theme import (QSS, GOLD, GREEN, BLUE, RED, AMBER, VIOLET, FG3)
 
-from PyQt6.QtCore import Qt, QEvent, QRectF, QRect, QPoint, QPointF, QTimer
+from PyQt6.QtCore import (Qt, QEvent, QRectF, QRect, QPoint, QPointF, QTimer,
+                          QPropertyAnimation, QEasingCurve)
 from PyQt6.QtGui import (QPainter, QColor, QPen, QBrush, QLinearGradient,
                          QRadialGradient, QPainterPath, QRegion, QShortcut,
                          QKeySequence, QPixmap)
 from PyQt6.QtWidgets import (QWidget, QFrame, QLabel, QVBoxLayout, QHBoxLayout,
                              QPushButton, QPlainTextEdit, QComboBox, QLineEdit,
                              QScrollArea, QMenu, QApplication, QFileDialog,
-                             QCheckBox)
+                             QCheckBox, QTextBrowser, QSizePolicy,
+                             QGraphicsOpacityEffect)
 
 DOT = {"empty": RED, "supported": AMBER, "locked": GREEN}
 STXT = {"empty": "未支撑", "supported": "待确认", "locked": "已确认"}
@@ -63,6 +66,135 @@ MORPH_CLOSE = 360  # ms（出场 = 入场的 75%）
 CONTENT_AT = 0.72  # 形状走到这里才放内容出来（此时圆角已落到 16px，内容不会再溢出轮廓）
 SHELL_LO, SHELL_HI = 0.25, 0.72   # 圆角"表面张力"区间：之前几乎胶囊，之后落到 16px
 ANIMATE = True     # uitest 会置 False，让走查保持同步
+
+
+# ---------------- Markdown → 富文本（§2.33）----------------
+# 用 markdown 库把回复转成 HTML，样式贴 theme（A·纪律：字号只用 12/13/15）。
+_MD_CSS = (
+    "p { margin: 0 0 7px 0; }"
+    "h1 { color: %s; font-size: 15px; font-weight: 600; margin: 10px 0 5px 0; }"
+    "h2 { color: %s; font-size: 13px; font-weight: 700; margin: 9px 0 5px 0; }"
+    "h3 { color: %s; font-size: 12px; font-weight: 700; margin: 8px 0 4px 0; }"
+    "a { color: %s; }"
+    "code { font-family: 'Cascadia Mono','Consolas',monospace; font-size: 11px; color: %s; }"
+    "pre { background-color: #141210; padding: 8px; }"
+    "blockquote { color: %s; margin: 6px 0 6px 10px; }"
+    "ul, ol { margin: 4px 0 7px 0; }"
+    "li { margin: 2px 0; }"
+    "th, td { padding: 3px 8px; }"
+    % (T.FG, T.FG, T.FG, T.BLUE, T.AMBER, T.FG3)
+)
+_MD = {"m": None}
+
+
+def md_html(text, caret=False):
+    """把回复按 Markdown 渲染成 HTML；caret=True 时末尾挂一个流式光标。"""
+    src = text or ""
+    try:
+        if _MD["m"] is None:
+            import markdown as _m
+            _MD["m"] = _m.Markdown(extensions=["fenced_code", "tables", "sane_lists", "nl2br"])
+        m = _MD["m"]
+        body = m.convert(src)
+        m.reset()          # 复用一个实例必须 reset，否则状态会串到下一条
+    except Exception:
+        import html as _h
+        body = "<p>%s</p>" % _h.escape(src).replace("\n", "<br>")
+    if caret:
+        body += ('<p style="margin:0"><span style="color:%s;font-size:13px;">▍</span></p>' % T.GOLD)
+    return '<div style="font-size:12px;color:%s;line-height:150%%;">%s</div>' % (T.FG2, body)
+
+
+class RichText(QTextBrowser):
+    """一小段 HTML 的渲染体：**自己不滚动**（滚动交给外层 QScrollArea），高度按内容自适应。
+
+    为什么不装 QtWebEngine：它太重，而且和我们这套 QPainter 自绘美学不是一路。
+    QTextBrowser 够用（Qt 的富文本子集），布局也简单。
+    """
+
+    def __init__(self, html="", app=None, parent=None):
+        super().__init__(parent)
+        self.setObjectName("rich")
+        self.setOpenExternalLinks(False)
+        self.setFrameShape(QFrame.Shape.NoFrame)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.document().setDefaultStyleSheet(_MD_CSS)
+        self.document().setDocumentMargin(0)
+        self._fitting = False
+        self._app = app
+        self.anchorClicked.connect(self._on_link)
+        if html:
+            self.set_html(html)
+
+    def _on_link(self, url):
+        if self._app is not None and url and url.toString():
+            self._app.open_url(url.toString())
+
+    def set_html(self, html):
+        self.setHtml(html)
+        self._fit()
+
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        self._fit()
+
+    def _fit(self):
+        """按 viewport 宽度重排，再把高度卡到内容高度 —— 不然会在外层滚动区里自己滚。"""
+        if self._fitting:
+            return
+        self._fitting = True
+        try:
+            w = self.viewport().width()
+            if w > 0:
+                self.document().setTextWidth(w)
+                h = int(self.document().size().height()) + 2
+                if abs(h - self.height()) > 1:
+                    self.setFixedHeight(max(18, h))
+        finally:
+            self._fitting = False
+
+
+class ThinkingDots(QWidget):
+    """三点呼吸的等待态（正在想 / 正在查资料…）—— 纯 QPainter，不用字形。"""
+
+    def __init__(self, text="正在想", parent=None):
+        super().__init__(parent)
+        self._text = text
+        self._t = 0
+        self.setFixedHeight(18)
+        self._tm = QTimer(self)
+        self._tm.timeout.connect(self._tick)
+        if ANIMATE:
+            self._tm.start(90)
+
+    def set_text(self, text):
+        self._text = text
+        self.update()
+
+    def _tick(self):
+        self._t = (self._t + 1) % 40
+        self.update()
+
+    def paintEvent(self, e):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        f = self.font()
+        f.setPointSizeF(9.5)
+        p.setFont(f)
+        p.setPen(QPen(QColor(FG3)))
+        p.drawText(QRect(0, 0, 78, self.height()),
+                   int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft), self._text)
+        for i in range(3):
+            a = 0.28 + 0.72 * (0.5 + 0.5 * math.sin((self._t / 40.0 * 2 * math.pi) - i * 0.7))
+            c = QColor(GOLD)
+            c.setAlphaF(a)
+            p.setBrush(QBrush(c))
+            p.setPen(Qt.PenStyle.NoPen)
+            p.drawEllipse(QRectF(82 + i * 9, self.height() / 2.0 - 2, 4, 4))
+        p.end()
 
 
 def _smoothstep(a, b, x):
@@ -128,6 +260,12 @@ class Panel(QWidget):
         self._search_input = None    # 搜索框（刷新会重建）
         self._chat_anchor = False    # 这次刷新要不要把对话滚到底
         self._chat_seen = 0          # 上一轮对话条数（变多了就滚到底）
+        # 对话体验（§2.33）：历史折叠 / 流式活体 / 光标闪烁
+        self._hist_open = False      # 历史是否展开（默认只看最近一轮）
+        self._live_rich = None       # 正在流式吐的那句的渲染体（直接改它，不重建面板）
+        self._live_text = ""
+        self._caret = True
+        self._caret_tm = None
 
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint
                             | Qt.WindowType.WindowStaysOnTopHint
@@ -1043,24 +1181,135 @@ class Panel(QWidget):
         v.addLayout(head)
         self._help_line(v, "chat",
                         "说思路，不用管格式；要动结构会先列出来，点了「照做」才动。")
-        if len(log) > self._chat_seen:          # 来了新消息：这次刷新滚到底
+        grew = len(log) > self._chat_seen     # 来了新消息：这次刷新滚到底，并给它一个入场动效
+        if grew:
             self._chat_anchor = True
         self._chat_seen = len(log)
-        for m in log[-10:]:
-            v.addWidget(self._bubble(m))
+        # 历史**默认只露最近一轮**（1 问 1 答）；点开才全量（§2.33）
+        total = len(log)
+        if total > 2:
+            bar = self._btn("收起历史" if self._hist_open
+                            else "展开历史（%d 条）" % (total - 2), "plain")
+            bar.setObjectName("hist_toggle")
+            bar.setToolTip("收起来只留最近一轮" if self._hist_open else "点开看这一期前面聊过的")
+            bar.clicked.connect(self._toggle_hist)
+            v.addWidget(bar)
+            show = log[-40:] if self._hist_open else log[-2:]
+        else:
+            show = log
+        self._live_rich = None
+        for i, m in enumerate(show):
+            box = self._bubble(m)
+            v.addWidget(box)
+            if grew and i == len(show) - 1 and m.get("role") != "sys":
+                self._fade_in(box)            # 最新那条淡入（只动它，别每条都动）
+        # 正在流式吐的那句（还没落库）：直连它、就地改，不整面板重建
+        live = s.get("live") or ""
         if s.get("chat_busy"):
-            v.addWidget(self._lab("AI 正在想…", "gold"))
+            if live:
+                box, rich = self._live_bubble(live)
+                self._live_rich, self._live_text = rich, live
+                v.addWidget(box)
+            else:
+                v.addWidget(ThinkingDots("正在想"))
+            if ANIMATE:
+                self._start_caret()
+        else:
+            self._stop_caret()
         self.chat_input = QPlainTextEdit()
         self.chat_input.setPlaceholderText("和它说点什么…（Enter 换行，Ctrl+Enter 发送）")
         self.chat_input.setFixedHeight(56)
+        self.chat_input.setEnabled(not s.get("chat_busy"))
         v.addWidget(self.chat_input)
         row = QHBoxLayout()
         row.addStretch(1)
+        if s.get("chat_busy"):
+            st = self._btn("停", "plain")
+            st.setObjectName("chat_stop")
+            st.setToolTip("别等了 —— 已经在吐的那句留着，不再往下说")
+            st.clicked.connect(lambda: self.app.stop_stream())
+            row.addWidget(st)
         b = self._btn("说给它", "primary")
+        b.setEnabled(not s.get("chat_busy"))
         b.clicked.connect(self._say)
         row.addWidget(b)
         v.addLayout(row)
         lay.addWidget(f)
+
+    # ---- §2.33 对话体验：历史折叠 / 流式活体 / 光标闪烁 / 入场淡入 ----
+    def _toggle_hist(self):
+        self._hist_open = not self._hist_open
+        self.refresh()
+
+    def _fade_in(self, w):
+        """最新那条消息淡入 —— 只给"新来的"那一块，别每条每次刷新都重播。"""
+        if not ANIMATE:
+            return
+        eff = QGraphicsOpacityEffect(w)
+        w.setGraphicsEffect(eff)
+        a = QPropertyAnimation(eff, b"opacity", w)
+        a.setDuration(240)
+        a.setStartValue(0.0)
+        a.setEndValue(1.0)
+        a.setEasingCurve(QEasingCurve.Type.OutCubic)
+        a.start()
+        w._fade_anim = a          # 保引用，别被 GC 掉（动效会中途消失）
+
+    def _start_caret(self):
+        if self._caret_tm is None:
+            self._caret_tm = QTimer(self)
+            self._caret_tm.timeout.connect(self._blink_caret)
+            self._caret_tm.start(520)
+
+    def _stop_caret(self):
+        if self._caret_tm is not None:
+            self._caret_tm.stop()
+            self._caret_tm.deleteLater()
+            self._caret_tm = None
+        self._caret = True
+
+    def _blink_caret(self):
+        self._caret = not self._caret
+        self.push_live(self._live_text)
+
+    def push_live(self, text):
+        """流式增量：**只更新那一句活体**，不整面板重建（§2.33）。"""
+        self._live_text = text or ""
+        if self._live_rich is None:
+            self.refresh()        # 还没有活体（刚换期/刚展开）→ 重建一次把它建出来
+            return
+        try:
+            self._live_rich.set_html(md_html(self._live_text, caret=self._caret))
+        except RuntimeError:
+            return
+        try:                      # 边流边钉到底
+            sb = self.scroll.verticalScrollBar()
+            sb.setValue(sb.maximum())
+        except RuntimeError:
+            pass
+
+    def _live_bubble(self, text):
+        """正在流式吐的那条 AI 消息（和落库后的 _bubble 长得一样，但没有动作/复制）。"""
+        box = QWidget()
+        v = QVBoxLayout(box)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(4)
+        body = QWidget()
+        body.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        body.setObjectName("turnai")
+        bv = QVBoxLayout(body)
+        bv.setContentsMargins(12, 0, 0, 0)
+        bv.setSpacing(4)
+        hd = QHBoxLayout()
+        hd.setSpacing(6)
+        hd.addWidget(self._mk("AI", "whoai"))
+        hd.addStretch(1)
+        bv.addLayout(hd)
+        rich = RichText(md_html(text, caret=self._caret), app=self.app)
+        rich.setObjectName("richturn")
+        bv.addWidget(rich)
+        v.addWidget(body)
+        return box, rich
 
     def _bubble(self, m):
         """一条对话 —— A·纪律：不用气泡，改「分组块 + 左侧发丝线」（§2.24）。
@@ -1097,7 +1346,9 @@ class Panel(QWidget):
         hd.addWidget(self._copy_btn(text))
         hd.addStretch(1)
         bv.addLayout(hd)
-        bv.addWidget(self._lab(text, "fg2"))
+        rt = RichText(md_html(text), app=self.app)   # 回复按 Markdown 渲染（§2.33）
+        rt.setObjectName("richturn")
+        bv.addWidget(rt)
         self._link_row(bv, self._urls(text))
 
         acts = m.get("actions") or []

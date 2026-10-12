@@ -1,5 +1,6 @@
 PyQt6>=6.6
 pywin32>=306
 Pillow>=10.0
+markdown>=3.5
 # 可选：只有要导出剪映草稿时才需要（缺了编排包里的其它文件照出）
 pyJianYingDraft>=0.2
